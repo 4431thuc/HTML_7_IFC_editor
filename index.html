@@ -18,6 +18,7 @@
             "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js",
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
             "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+            "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.8/build/index.module.js",
             "web-ifc": "https://cdn.jsdelivr.net/npm/web-ifc@0.0.66/web-ifc-api.js"
         }
     }
@@ -505,8 +506,8 @@
                             </div>
                         </div>
 
-                        <div v-show="grp.expanded" class="bg-slate-950/60 border-t border-slate-800/80 divide-y divide-slate-800/40">
-                            <div v-for="mesh in grp.meshes" :key="mesh.uuid" :data-mesh-uuid="mesh.uuid"
+                        <div v-if="grp.expanded" class="bg-slate-950/60 border-t border-slate-800/80 divide-y divide-slate-800/40">
+                            <div v-for="mesh in grp.objects" :key="mesh.uuid" :data-mesh-uuid="mesh.uuid"
                                 @click.stop="onItemClick(mesh, $event)"
                                 @dblclick.stop="onItemDblClick(mesh)"
                                 @mouseenter="onItemMouseEnter(mesh)"
@@ -1180,11 +1181,14 @@
 </div>
 
 <script type="module">
-    import { createApp, ref, reactive, computed, nextTick, toRaw, onMounted, onBeforeUnmount } from 'vue';
+    import { createApp, ref, reactive, computed, nextTick, toRaw, markRaw, onMounted, onBeforeUnmount } from 'vue';
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { TransformControls } from 'three/addons/controls/TransformControls.js';
+    import { computeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
     import * as WebIFC from 'web-ifc';
+    THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+    THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
     // Bảng màu phân biệt cấu kiện kiến trúc & kết cấu
     const ENTITY_DEFAULT_COLORS = {
@@ -1432,6 +1436,10 @@
             let scene, camera, perspCamera, orthoCamera, activeCamera, renderer, controls, gridHelper;
             let dirLight1, dirLight2, ambientLight, hemiLight;
             let animationFrameId = null;
+            let needsRender = true;
+            let lastRenderTime = 0;
+            const IDLE_RENDER_INTERVAL_MS = 200;
+            const requestRender = () => { needsRender = true; };
             let ifcAPI = null;
             let currentModelID = null;
             let modelGroup = new THREE.Group();
@@ -1475,6 +1483,14 @@
 
             // Nhóm viền đen mỏng Edges
             const edgesGroup = new THREE.Group();
+            // BatchedMesh: mỗi cấu kiện là một instance trong batch theo vật liệu; mesh gốc chỉ giữ dữ liệu (layer ẩn khỏi render)
+            const batchGroup = new THREE.Group();
+            const overlayGroup = new THREE.Group();
+            let batchRecords = [];
+            // Một đối tượng logic = tất cả mesh có cùng meshKey (cùng expressID trong một file)
+            let meshesByKey = new Map();
+            const batchSlotByElement = new WeakMap();
+            const overlayByElement = new Map();
             const edgeCropUniforms = {
                 cropActive: { value: false },
                 showOutsideEdges: { value: false },
@@ -1502,6 +1518,8 @@
             let sourceFileSequence = 0;
             const createMeshKey = (sourceId, expressID) => `${sourceId || 'demo'}:${expressID}`;
             const getMeshKey = (mesh) => mesh.userData.meshKey || createMeshKey(mesh.userData.sourceId, mesh.userData.expressID);
+            const getObjectMeshes = (mesh) => meshesByKey.get(getMeshKey(toRaw(mesh))) || [toRaw(mesh)];
+            const countLogicalObjects = () => new Set(modelGroup.children.filter(c => c.isMesh).map(getMeshKey)).size;
             const getPsetCacheKey = (sourceId, expressID) => createMeshKey(sourceId, expressID);
             const materialCache = new Map();
             const flatMaterialCache = new WeakMap();
@@ -1533,6 +1551,8 @@
             const mouse = new THREE.Vector2();
             let pointerDownPos = { x: 0, y: 0 };
             let isMiddleMouseDown = false;
+            let isOrbiting = false;
+            let lastSelectedMeshes = new Set();
             let hoveredMesh = null;
 
             const hoverMaterial = new THREE.MeshStandardMaterial({
@@ -2130,12 +2150,15 @@
                 scene.add(transportGroup);
                 transportGroup.add(modelGroup);
                 modelGroup.add(edgesGroup);
+                modelGroup.add(batchGroup);
+                modelGroup.add(overlayGroup);
                 scene.add(cropGroup);
 
                 // Khởi tạo CropBox 6 mặt độc lập kèm 6 mũi tên
                 init6FaceCropBox();
 
                 createSampleRebarModel();
+                rebuildBatches();
                 applyModelOpacityToScene();
 
                 const domElem = renderer.domElement;
@@ -2144,13 +2167,20 @@
                 domElem.addEventListener('pointercancel', onPointerUp);
                 domElem.addEventListener('pointermove', onPointerMove);
                 domElem.addEventListener('pointerleave', onPointerLeave);
+                controls.addEventListener('change', requestRender);
                 window.addEventListener('resize', onWindowResize);
 
+                // Render theo nhu cầu: chỉ vẽ khi camera/tương tác có thay đổi, còn lại refresh nền mỗi 200ms
                 const animate = () => {
                     animationFrameId = requestAnimationFrame(animate);
                     controls.update();
+                    const now = performance.now();
+                    if (!needsRender && now - lastRenderTime < IDLE_RENDER_INTERVAL_MS) return;
+                    needsRender = false;
+                    lastRenderTime = now;
                     if (isCropBoxActive.value) updateCropHandleScales();
                     updateAxisGizmo();
+                    syncBatchVisibility();
                     renderer.render(scene, camera);
                 };
                 animate();
@@ -2299,10 +2329,12 @@
                     arrowHelper.cone.renderOrder = 10;
                     handleObj.add(arrowHelper);
 
-                    // Khối tương tác để pick mũi tên (sphere vô hình, to hơn để dễ bắt)
-                    const hitGeo = new THREE.SphereGeometry(0.5, 8, 8);
+                    // Khối tương tác vô hình bám đúng thân + đầu mũi tên (cone bán kính 0.22, dài 0.9), không lấn sang vùng xoay view
+                    const hitGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.9, 8, 1, false);
                     const hitMat = new THREE.MeshBasicMaterial({ visible: false });
                     const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+                    hitMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), f.normal);
+                    hitMesh.position.copy(f.normal).multiplyScalar(0.45);
                     handleObj.add(hitMesh);
 
                     handleObj.userData = {
@@ -2514,6 +2546,8 @@
             };
 
             const createEdgeOutline = (mesh, bufferGeo) => {
+                if (mesh.userData.edgesBuilt) return;
+                mesh.userData.edgesBuilt = true;
                 try {
                     // Tối ưu hóa: Chỉ tạo edges cho các cấu kiện có số đỉnh vừa phải để tránh lag khi mở file 30MB
                     if (bufferGeo.attributes.position.count > 4000) return;
@@ -2529,6 +2563,16 @@
                     console.error('Không thể tạo viền cấu kiện:', e);
                 }
             };
+
+            // Viền chỉ được tạo khi cần hiển thị (lazy), tránh tạo EdgesGeometry cho toàn bộ cấu kiện lúc mở file
+            const ensureEdgesForVisibleMeshes = () => {
+                modelGroup.children.forEach(mesh => {
+                    if (mesh.isMesh && mesh.visible && !mesh.userData.isRebar && !mesh.userData.edgesBuilt) {
+                        createEdgeOutline(mesh, mesh.geometry);
+                    }
+                });
+            };
+
 
             const getRebarColorByDiameter = (diameterMm) => {
                 const dia = Math.round(parseDiameterMm(diameterMm));
@@ -2681,7 +2725,7 @@
                     psets: [{ name: 'Pset_SlabCommon', properties: [{ name: 'Thickness', value: '250 mm' }] }]
                 });
 
-                stats.meshes = modelGroup.children.filter(c => c.isMesh).length;
+                stats.meshes = countLogicalObjects();
                 stats.rebarCount = modelGroup.children.filter(m => m.isMesh && m.userData.isRebar).length;
                 buildAllGroupingCollections();
                 fitCameraToModel();
@@ -2777,6 +2821,7 @@
                     await new Promise(resolve => setTimeout(resolve, 30));
 
                     let meshCount = 0;
+                    const loadedObjectKeys = new Set();
                     let rebarCount = 0;
                     let faultyCountAcc = 0;
                     const schemaCounts = new Map();
@@ -2846,19 +2891,19 @@
                             mesh.userData.colorByDiameter = isRebar ? getRebarColorByDiameter(mesh.userData.diameter) : '';
                             modelGroup.add(mesh);
                             meshCount++;
+                            loadedObjectKeys.add(getMeshKey(mesh));
                             if (isRebar) {
                                 rebarCount++;
                                 if (checkIfFaultyRebar(mesh)) {
                                     mesh.userData.isFaulty = true;
                                     faultyCountAcc++;
                                 }
-                            } else {
-                                createEdgeOutline(mesh, mesh.geometry);
                             }
                         }
                     });
 
                     if (meshCount === 0) throw new Error(`Không tìm thấy hình học 3D trong file "${file.name}".`);
+                    rebuildBatches();
 
                     sourceFiles.value.push({
                         id: sourceId,
@@ -2875,7 +2920,7 @@
                     });
                     isSampleModel.value = false;
                     hasLoadedIfc.value = true;
-                    stats.meshes = modelGroup.children.filter(child => child.isMesh).length;
+                    stats.meshes = countLogicalObjects();
                     stats.rebarCount = modelGroup.children.filter(mesh => mesh.isMesh && mesh.userData.isRebar).length;
                     faultyCount.value = modelGroup.children.filter(mesh => mesh.isMesh && mesh.userData.isFaulty).length;
 
@@ -2888,7 +2933,7 @@
                     showEdges.value = !(rebarRatio > 0.35 || stats.rebarCount > 600);
                     updateEdgesVisibility();
                     if (isCropBoxActive.value) resetCropBoxToModel();
-                    showToast('Tải thành công', `Đã thêm "${file.name}": ${meshCount} cấu kiện (${rebarCount} cốt thép).`, 'success');
+                    showToast('Tải thành công', `Đã thêm "${file.name}": ${loadedObjectKeys.size} cấu kiện (${rebarCount} cốt thép).`, 'success');
                     return true;
                 } catch (error) {
                     console.error(`Lỗi phân tích IFC "${file.name}":`, error);
@@ -2902,6 +2947,7 @@
                         mesh.geometry?.dispose();
                         modelGroup.remove(mesh);
                     });
+                    rebuildBatches();
                     psetCache.forEach((value, key) => {
                         if (key.startsWith(`${sourceId}:`)) psetCache.delete(key);
                     });
@@ -2920,10 +2966,11 @@
 
             const toggleSourceVisibility = (source) => {
                 source.visible = !source.visible;
+                const groupVisibilityMap = buildGroupVisibilityMap();
                 modelGroup.children.forEach(mesh => {
                     if (mesh.isMesh && mesh.userData.sourceId === source.id) {
                         mesh.userData.sourceVisible = source.visible;
-                        mesh.visible = shouldMeshBeVisible(mesh);
+                        mesh.visible = shouldMeshBeVisible(mesh, groupVisibilityMap);
                     }
                 });
                 updateEdgesVisibility();
@@ -2955,6 +3002,7 @@
                     mesh.geometry?.dispose();
                     modelGroup.remove(mesh);
                 });
+                rebuildBatches();
 
                 const sourceKeyPrefix = `${source.id}:`;
                 Array.from(pendingDeletedExpressIDs).forEach(key => {
@@ -2978,7 +3026,7 @@
 
                 fileName.value = sourceFiles.value[0]?.name || '';
                 hasLoadedIfc.value = sourceFiles.value.length > 0;
-                stats.meshes = modelGroup.children.filter(mesh => mesh.isMesh).length;
+                stats.meshes = countLogicalObjects();
                 stats.rebarCount = modelGroup.children.filter(mesh => mesh.isMesh && mesh.userData.isRebar).length;
                 faultyCount.value = modelGroup.children.filter(mesh => mesh.isMesh && mesh.userData.isFaulty).length;
                 if (stats.meshes === 0) {
@@ -3027,6 +3075,7 @@
                 geometryData.delete();
 
                 bufferGeo.computeVertexNormals();
+                bufferGeo.computeBoundsTree();
 
                 // LẤY MÀU SẮC CHUẨN XÁC:
                 let assignedColorHex;
@@ -3273,6 +3322,16 @@
                     entGrp.meshes.push(mesh);
                 });
 
+                Object.values(groupBuilders).forEach(builder => builder.forEach(grp => {
+                    const byKey = new Map();
+                    grp.meshes.forEach(mesh => {
+                        const key = getMeshKey(mesh);
+                        if (!byKey.has(key)) byKey.set(key, mesh);
+                    });
+                    grp.objects = Array.from(byKey.values());
+                    grp.count = grp.objects.length;
+                }));
+
                 const sortFn = (a, b) => {
                     if (a.isRebarGroup && !b.isRebarGroup) return -1;
                     if (!a.isRebarGroup && b.isRebarGroup) return 1;
@@ -3287,11 +3346,13 @@
                 // Sắp xếp các đối tượng con bên trong mỗi nhóm theo Name tăng dần
                 ['pos', 'name', 'objectType', 'entity'].forEach(key => {
                     allGroups[key].forEach(grp => {
-                        grp.meshes.sort((m1, m2) => {
+                        const byName = (m1, m2) => {
                             const n1 = m1.userData.name || '';
                             const n2 = m2.userData.name || '';
                             return n1.localeCompare(n2, undefined, { numeric: true, sensitivity: 'base' });
-                        });
+                        };
+                        grp.meshes.sort(byName);
+                        grp.objects.sort(byName);
                     });
                 });
             };
@@ -3331,8 +3392,9 @@
                 if (grp.visible) {
                     grp.meshes.forEach(mesh => manuallyHiddenExpressIDs.delete(getMeshKey(mesh)));
                 }
+                const groupVisibilityMap = buildGroupVisibilityMap();
                 grp.meshes.forEach(mesh => {
-                    mesh.visible = shouldMeshBeVisible(mesh);
+                    mesh.visible = shouldMeshBeVisible(mesh, groupVisibilityMap);
                 });
                 updateEdgesVisibility();
             };
@@ -3344,38 +3406,49 @@
                     if (visible) {
                         grp.meshes.forEach(mesh => manuallyHiddenExpressIDs.delete(getMeshKey(mesh)));
                     }
+                });
+                const groupVisibilityMap = buildGroupVisibilityMap();
+                list.forEach(grp => {
                     grp.meshes.forEach(mesh => {
-                        mesh.visible = shouldMeshBeVisible(mesh);
+                        mesh.visible = shouldMeshBeVisible(mesh, groupVisibilityMap);
                     });
                 });
                 updateEdgesVisibility();
                 updateSelectionOutlines();
             };
 
-            const shouldMeshBeVisible = (mesh) => {
+            const buildGroupVisibilityMap = () => {
+                const visibilityByName = new Map();
+                (allGroups[groupCriterion.value] || []).forEach(g => {
+                    if (!visibilityByName.has(g.name)) visibilityByName.set(g.name, g.visible);
+                });
+                return visibilityByName;
+            };
+
+            const shouldMeshBeVisible = (mesh, groupVisibilityMap = buildGroupVisibilityMap()) => {
                 const meshKey = getMeshKey(mesh);
                 if (pendingDeletedExpressIDs.has(meshKey) || manuallyHiddenExpressIDs.has(meshKey)) return false;
                 if (mesh.userData.sourceVisible === false) return false;
                 if (filterFaultyBars.value && mesh.userData.isFaulty) return false;
                 if (isRebarOnly.value && !mesh.userData.isRebar) return false;
 
-                const currentGroupList = allGroups[groupCriterion.value] || [];
                 let key = '';
                 if (groupCriterion.value === 'pos') key = mesh.userData.tag || (mesh.userData.isRebar ? 'Khác / Chưa đặt Pos' : 'Không có Tag/Pos');
                 else if (groupCriterion.value === 'name') key = mesh.userData.name || 'Chưa đặt tên (Unnamed)';
                 else if (groupCriterion.value === 'objectType') key = mesh.userData.objectType || 'Chưa có ObjectType';
                 else if (groupCriterion.value === 'entity') key = mesh.userData.type || 'IFCELEMENT';
 
-                const targetGrp = currentGroupList.find(g => g.name === key);
-                if (targetGrp && !targetGrp.visible) return false;
+                if (groupVisibilityMap.get(key) === false) return false;
 
                 return true;
             };
 
             const updateAllMeshesVisibility = () => {
+                requestRender();
+                const groupVisibilityMap = buildGroupVisibilityMap();
                 modelGroup.children.forEach(mesh => {
                     if (mesh.isMesh) {
-                        mesh.visible = shouldMeshBeVisible(mesh);
+                        mesh.visible = shouldMeshBeVisible(mesh, groupVisibilityMap);
                     }
                 });
                 updateEdgesVisibility();
@@ -3383,6 +3456,8 @@
             };
 
             const updateEdgesVisibility = () => {
+                requestRender();
+                if (showEdges.value && !isRebarOnly.value) ensureEdgesForVisibleMeshes();
                 edgesGroup.visible = showEdges.value;
                 edgesGroup.children.forEach(line => {
                     const parentMesh = line.userData.parentMesh;
@@ -3403,11 +3478,13 @@
             };
 
             const applyXRayMaterialEffect = () => {
+                refreshBatchMaterials();
                 updateSelectionDimmingEffect();
             };
 
             const toggleFlatShading = () => {
                 isFlatShading.value = !isFlatShading.value;
+                refreshBatchMaterials();
                 updateSelectionDimmingEffect();
             };
 
@@ -3473,6 +3550,7 @@
                 });
                 hoverMaterial.wireframe = isWireframe.value;
                 selectMaterial.wireframe = isWireframe.value;
+                refreshBatchMaterials();
             };
 
             const toggleGrid = () => {
@@ -3525,13 +3603,13 @@
                 });
             };
 
-            const updateSelectionDimmingEffect = () => {
+            const updateSelectionDimmingEffect = (incremental = false) => {
+                requestRender();
                 const selected = new Set(selectedMeshes.value.map(toRaw));
 
                 updateSelectionOutlines();
-                modelGroup.children.forEach(mesh => {
+                const applyMeshSelectionState = (mesh) => {
                     if (!mesh.isMesh) return;
-                    
                     if (selected.has(mesh)) {
                         applyModelOpacityToMaterial(selectMaterial);
                         const planes = isCropBoxActive.value ? clippingPlanes : null;
@@ -3539,12 +3617,21 @@
                             selectMaterial.clippingPlanes = planes;
                             selectMaterial.needsUpdate = true;
                         }
-                        mesh.material = selectMaterial;
+                        setElementOverlay(mesh, selectMaterial);
                     } else {
                         restoreMeshMaterial(mesh);
                     }
-                });
+                };
+
+                // Chế độ incremental chỉ xử lý mesh vừa chọn/bỏ chọn, tránh quét O(n) mỗi lần click
+                if (incremental) {
+                    new Set([...lastSelectedMeshes, ...selected]).forEach(applyMeshSelectionState);
+                } else {
+                    modelGroup.children.forEach(applyMeshSelectionState);
+                }
+                lastSelectedMeshes = selected;
             };
+
 
             const fitCameraToTarget = () => {
                 if (selectedMeshes.value.length > 0) {
@@ -3644,13 +3731,13 @@
                 if (gridHelper) gridHelper.position.set(center.x, box.min.y, center.z);
             };
 
-            const restoreMeshMaterial = (mesh) => {
+            // Vật liệu hiển thị của một batch theo chế độ X-ray / Flat / bình thường
+            const getDisplayMaterial = (original, isRebar) => {
                 let material;
-                if (isXRayMode.value && !mesh.userData.isRebar) {
+                if (isXRayMode.value && !isRebar) {
                     material = isFlatShading.value ? xrayMaterials.flat : xrayMaterials.lit;
                     applyModelOpacityToMaterial(material, xrayOpacity.value);
                 } else {
-                    const original = toRaw(mesh.userData.originalMaterial);
                     material = original;
                     if (isFlatShading.value) {
                         material = flatMaterialCache.get(original);
@@ -3674,7 +3761,59 @@
                     material.needsUpdate = true;
                 }
                 material.wireframe = isWireframe.value;
-                mesh.material = material;
+                return material;
+            };
+
+            const refreshBatchMaterials = () => {
+                batchRecords.forEach(record => {
+                    record.batch.material = getDisplayMaterial(record.original, record.isRebar);
+                });
+            };
+
+            const setBatchInstanceVisible = (element, visible) => {
+                const slot = batchSlotByElement.get(element);
+                if (slot) slot.batch.setVisibleAt(slot.id, visible);
+            };
+
+            // Đồng bộ visibility logic của từng cấu kiện vào instance trong batch (instance đang được overlay thì ẩn)
+            const syncBatchVisibility = () => {
+                batchRecords.forEach(record => {
+                    record.elements.forEach((element, id) => {
+                        record.batch.setVisibleAt(id, element.visible && !overlayByElement.has(element));
+                    });
+                });
+                overlayByElement.forEach((overlay, element) => {
+                    overlay.visible = element.visible;
+                });
+            };
+
+            // Overlay: vẽ cấu kiện được chọn/hover bằng material riêng, ẩn instance gốc trong batch
+            const setElementOverlay = (mesh, material) => {
+                let overlay = overlayByElement.get(mesh);
+                if (!overlay) {
+                    overlay = new THREE.Mesh(mesh.geometry, material);
+                    overlay.userData.element = mesh;
+                    overlayGroup.add(overlay);
+                    overlayByElement.set(mesh, overlay);
+                }
+                overlay.material = material;
+                mesh.matrix.decompose(overlay.position, overlay.quaternion, overlay.scale);
+                overlay.visible = mesh.visible;
+                setBatchInstanceVisible(mesh, false);
+            };
+
+            const removeElementOverlay = (mesh) => {
+                const overlay = overlayByElement.get(mesh);
+                if (!overlay) return;
+                overlayGroup.remove(overlay);
+                overlayByElement.delete(mesh);
+                setBatchInstanceVisible(mesh, mesh.visible);
+            };
+
+            const restoreMeshMaterial = (mesh) => {
+                getObjectMeshes(mesh).forEach(member => {
+                    if (!isMeshSelected(member)) removeElementOverlay(member);
+                });
             };
 
             const applyHoverMaterial = (mesh) => {
@@ -3685,11 +3824,82 @@
                     hoverMaterial.needsUpdate = true;
                 }
                 hoverMaterial.wireframe = isWireframe.value;
-                mesh.material = hoverMaterial;
+                getObjectMeshes(mesh).forEach(member => setElementOverlay(member, hoverMaterial));
             };
 
+            // Xây lại toàn bộ batch từ các cấu kiện hiện có trong modelGroup (gọi sau khi load/xóa/đổi tập cấu kiện)
+            const rebuildBatches = () => {
+                overlayByElement.forEach(overlay => overlayGroup.remove(overlay));
+                overlayByElement.clear();
+                batchRecords.forEach(record => {
+                    batchGroup.remove(record.batch);
+                    record.batch.dispose();
+                });
+                batchRecords = [];
+                hoveredMesh = null;
+
+                const groups = new Map();
+                meshesByKey = new Map();
+                modelGroup.children.forEach(child => {
+                    if (!child.isMesh) return;
+                    child.layers.set(1);
+                    child.updateMatrix();
+                    markRaw(child);
+                    const objectKey = getMeshKey(child);
+                    if (!meshesByKey.has(objectKey)) meshesByKey.set(objectKey, []);
+                    meshesByKey.get(objectKey).push(child);
+                    const original = toRaw(child.userData.originalMaterial);
+                    const isRebar = !!child.userData.isRebar;
+                    const attrNames = Object.keys(child.geometry.attributes).sort().join(',');
+                    const key = `${original.uuid}|${isRebar}|${attrNames}`;
+                    if (!groups.has(key)) groups.set(key, { original, isRebar, elements: [] });
+                    groups.get(key).elements.push(child);
+                });
+
+                groups.forEach(({ original, isRebar, elements }) => {
+                    let vertexCount = 0;
+                    let indexCount = 0;
+                    elements.forEach(element => {
+                        const geo = element.geometry;
+                        if (!geo.index) geo.setIndex(Array.from({ length: geo.attributes.position.count }, (_, i) => i));
+                        vertexCount += geo.attributes.position.count;
+                        indexCount += geo.index.count;
+                    });
+                    const batch = new THREE.BatchedMesh(elements.length, vertexCount, indexCount, getDisplayMaterial(original, isRebar));
+                    batch.frustumCulled = false;
+                    const record = { batch, original, isRebar, elements };
+                    batch.userData.record = record;
+                    elements.forEach((element, id) => {
+                        const geometryId = batch.addGeometry(element.geometry);
+                        batch.setMatrixAt(geometryId, element.matrix);
+                        batchSlotByElement.set(element, { batch, id: geometryId });
+                    });
+                    // Tính sẵn bounds của từng instance lúc load, tránh lazy-init gây khựng ở lần xoay/pan đầu tiên
+                    batch.computeBoundingBox();
+                    batch.computeBoundingSphere();
+                    batchGroup.add(batch);
+                    batchRecords.push(record);
+                });
+                syncBatchVisibility();
+                // Compile sẵn shader của material overlay (chọn/hover) để lần hover đầu không gây khựng
+                const warmupGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.001);
+                const warmupMeshes = [hoverMaterial, selectMaterial].map(material => new THREE.Mesh(warmupGeometry, material));
+                warmupMeshes.forEach(mesh => scene.add(mesh));
+                renderer.compile(scene, camera);
+                warmupMeshes.forEach(mesh => scene.remove(mesh));
+                warmupGeometry.dispose();
+                if (selectedMeshes.value.length > 0) updateSelectionDimmingEffect();
+            };
+
+            // Chuyển hit của raycast batch/overlay về đúng cấu kiện
+            const resolveHitElement = (intersect) => {
+                if (intersect.object.userData.element) return intersect.object.userData.element;
+                return intersect.object.userData.record?.elements[intersect.batchId] ?? null;
+            };
+
+
             const onGroupMouseEnter = (grp) => {
-                grp.meshes.forEach(mesh => {
+                grp.objects.forEach(mesh => {
                     if (!isMeshSelected(mesh) && mesh.visible) {
                         applyHoverMaterial(mesh);
                     }
@@ -3697,7 +3907,7 @@
             };
 
             const onGroupMouseLeave = (grp) => {
-                grp.meshes.forEach(mesh => {
+                grp.objects.forEach(mesh => {
                     if (!isMeshSelected(mesh)) {
                         restoreMeshMaterial(mesh);
                     }
@@ -3754,24 +3964,24 @@
 
             const handleMeshSelection = (mesh, isMultiSelect = false) => {
                 mesh = toRaw(mesh);
+                const objectMeshes = getObjectMeshes(mesh);
                 if (!isMultiSelect) {
-                    selectedMeshes.value = [mesh];
+                    selectedMeshes.value = [...objectMeshes];
                     showPropertiesForMesh(mesh);
-                } else {
-                    const idx = selectedMeshes.value.findIndex(selected => toRaw(selected) === mesh);
-                    if (idx > -1) {
-                        selectedMeshes.value.splice(idx, 1);
-                        if (selectedMeshes.value.length > 0) {
-                            showPropertiesForMesh(selectedMeshes.value[selectedMeshes.value.length - 1]);
-                        } else {
-                            selectedObject.value = null;
-                        }
+                } else if (isMeshSelected(mesh)) {
+                    selectedMeshes.value = selectedMeshes.value.filter(selected => !objectMeshes.includes(toRaw(selected)));
+                    if (selectedMeshes.value.length > 0) {
+                        showPropertiesForMesh(toRaw(selectedMeshes.value[selectedMeshes.value.length - 1]));
                     } else {
-                        selectedMeshes.value.push(mesh);
-                        showPropertiesForMesh(mesh);
+                        selectedObject.value = null;
                     }
+                } else {
+                    objectMeshes.forEach(member => {
+                        if (!isMeshSelected(member)) selectedMeshes.value.push(member);
+                    });
+                    showPropertiesForMesh(mesh);
                 }
-                updateSelectionDimmingEffect();
+                updateSelectionDimmingEffect(true);
                 showRightPanel.value = true;
             };
 
@@ -3781,6 +3991,7 @@
                 const group = allGroups[groupCriterion.value].find(grp =>
                     grp.meshes.some(item => toRaw(item) === rawMesh));
                 if (!group) return;
+                const rowMesh = group.objects.find(obj => getMeshKey(obj) === getMeshKey(rawMesh)) || rawMesh;
                 if (!filteredGroups.value.includes(group)) {
                     groupSearchQuery.value = '';
                     showToast('Danh sách nhóm', 'Đã xóa bộ lọc tìm kiếm để hiển thị cấu kiện được chọn.', 'success');
@@ -3789,7 +4000,7 @@
                 await nextTick();
                 const container = groupListContainer.value;
                 if (!container) return;
-                const row = container.querySelector(`[data-mesh-uuid="${rawMesh.uuid}"]`);
+                const row = container.querySelector(`[data-mesh-uuid="${rowMesh.uuid}"]`);
                 if (!row) return;
                 const rowRect = row.getBoundingClientRect();
                 const listRect = container.getBoundingClientRect();
@@ -3799,7 +4010,8 @@
             };
 
             const showPropertiesForMesh = (mesh) => {
-                const box = new THREE.Box3().setFromObject(mesh);
+                const box = new THREE.Box3();
+                getObjectMeshes(mesh).forEach(member => box.union(new THREE.Box3().setFromObject(member)));
                 const size = box.getSize(new THREE.Vector3());
                 const dimensions = {
                     x: size.x.toFixed(3),
@@ -3936,12 +4148,15 @@
             };
 
             const getVisibleModelIntersections = () => {
-                const visibleMeshes = modelGroup.children.filter(mesh => mesh.isMesh && mesh.visible);
-                return raycaster.intersectObjects(visibleMeshes, false)
+                syncBatchVisibility();
+                const pickables = batchRecords.map(record => record.batch);
+                overlayByElement.forEach(overlay => { if (overlay.visible) pickables.push(overlay); });
+                return raycaster.intersectObjects(pickables, false)
                     .filter(hit => isPointInsideCropBounds(hit.point));
             };
 
             const onPointerDown = (event) => {
+                requestRender();
                 pointerDownPos = { x: event.clientX, y: event.clientY };
 
                 if (event.button === 1) {
@@ -3986,10 +4201,13 @@
                     boxStart.y = event.clientY;
                     boxEnd.x = event.clientX;
                     boxEnd.y = event.clientY;
+                } else if (event.button === 0) {
+                    isOrbiting = true;
                 }
             };
 
             const onPointerMove = (event) => {
+                requestRender();
                 if (isBoxSelecting.value) {
                     boxEnd.x = event.clientX;
                     boxEnd.y = event.clientY;
@@ -4048,7 +4266,7 @@
                     clearCropHandleHover();
                 }
 
-                if (isLoading.value || modelGroup.children.length === 0 || isMiddleMouseDown) return;
+                if (isLoading.value || modelGroup.children.length === 0 || isMiddleMouseDown || isOrbiting) return;
                 updateMouseCoords(event);
                 raycaster.setFromCamera(mouse, camera);
                 const intersects = getVisibleModelIntersections();
@@ -4060,7 +4278,7 @@
                 hoveredType.value = '';
 
                 if (intersects.length > 0) {
-                    const hit = intersects[0].object;
+                    const hit = resolveHitElement(intersects[0]);
                     hoveredMesh = hit;
                     renderer.domElement.style.cursor = 'pointer';
 
@@ -4074,9 +4292,11 @@
             };
 
             const onPointerUp = (event) => {
+                requestRender();
                 if (event.button === 1) {
                     isMiddleMouseDown = false;
                 }
+                isOrbiting = false;
 
                 // Kết thúc kéo tay cầm CropBox
                 if (cropDragHandle) {
@@ -4102,7 +4322,7 @@
                 const intersects = getVisibleModelIntersections();
 
                 if (intersects.length > 0) {
-                    const hit = intersects[0].object;
+                    const hit = resolveHitElement(intersects[0]);
                     const isMultiSelect = event.ctrlKey || event.metaKey;
                     handleMeshSelection(hit, isMultiSelect);
                     if (isMeshSelected(hit)) revealMeshInGroups(hit);
@@ -4112,6 +4332,7 @@
             };
 
             const onPointerLeave = () => {
+                requestRender();
                 if (cropDragHandle) return;
                 clearCropHandleHover();
                 if (hoveredMesh && !isMeshSelected(hoveredMesh)) restoreMeshMaterial(hoveredMesh);
@@ -4184,10 +4405,12 @@
                     const intersectsSelection = screenMaxX >= minX && screenMinX <= maxX &&
                         screenMaxY >= minY && screenMinY <= maxY;
                     if (!(isContainmentSelection ? fullyContained : intersectsSelection)) return;
-                    if (!isMeshSelected(mesh)) selectedMeshes.value.push(mesh);
+                    getObjectMeshes(mesh).forEach(member => {
+                        if (!isMeshSelected(member)) selectedMeshes.value.push(member);
+                    });
                 });
 
-                updateSelectionDimmingEffect();
+                updateSelectionDimmingEffect(true);
 
                 if (selectedMeshes.value.length > 0) {
                     showPropertiesForMesh(selectedMeshes.value[selectedMeshes.value.length - 1]);
@@ -4201,7 +4424,7 @@
                 selectedMeshes.value = [];
                 selectedObject.value = null;
                 isEditingAttributes.value = false;
-                updateSelectionDimmingEffect();
+                updateSelectionDimmingEffect(true);
             };
 
             // --- 8. CONTEXT MENU ---
@@ -4560,8 +4783,8 @@
 
                 while (modelGroup.children.length > 0) {
                     const child = modelGroup.children[0];
-                    if (child === edgesGroup) {
-                        modelGroup.remove(edgesGroup);
+                    if (child === edgesGroup || child === batchGroup || child === overlayGroup) {
+                        modelGroup.remove(child);
                         continue;
                     }
                     if (child.geometry) child.geometry.dispose();
@@ -4574,6 +4797,9 @@
                     edgesGroup.remove(edgeLine);
                 }
                 modelGroup.add(edgesGroup);
+                modelGroup.add(batchGroup);
+                modelGroup.add(overlayGroup);
+                rebuildBatches();
 
                 modelGroup.position.set(0, 0, 0);
                 modelOffset.set(0, 0, 0);
@@ -4605,6 +4831,7 @@
             };
 
             const onWindowResize = () => {
+                requestRender();
                 const container = canvasContainer.value;
                 if (!container || !renderer) return;
 
