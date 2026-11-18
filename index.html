@@ -67,13 +67,13 @@
 </head>
 <body class="bg-slate-900 text-slate-100 h-screen w-screen flex flex-col" @click="closeContextMenu">
 
-<div id="app" class="h-full w-full flex flex-col relative" tabindex="0">
+<div id="app" class="h-full w-full flex flex-col relative" tabindex="0" @click.capture="playUiPop">
     
     <!-- 1. THANH CÔNG CỤ (HEADER / TOOLBAR) -->
-    <header class="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between z-20 shrink-0 shadow-md">
+    <header class="h-12 bg-slate-900 border-b border-slate-800 px-3 flex items-center justify-between z-20 shrink-0 shadow-md">
         <!-- Logo & Tiêu đề -->
         <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
                 <i class="ph-bold ph-cube text-xl text-white"></i>
             </div>
             <div>
@@ -89,15 +89,15 @@
         <!-- Các nút thao tác chính trên Toolbar -->
         <div class="flex items-center gap-2">
             <!-- Nút Mở file IFC -->
-            <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg flex items-center gap-2 transition shadow-sm">
+            <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition shadow-sm">
                 <i class="ph-bold ph-folder-open text-base"></i>
                 <span>Mở IFC</span>
                 <input type="file" accept=".ifc" @change="handleFileUpload" class="hidden" :disabled="isLoading || !wasmReady">
             </label>
 
             <!-- Nút Lưu / Xuất IFC mới -->
-            <button @click="exportModifiedIFC" :disabled="isLoading || !wasmReady"
-                class="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg flex items-center gap-1.5 transition shadow-sm"
+            <button @click="exportModifiedIFC" :disabled="isLoading || !wasmReady || !hasUnsavedChanges"
+                class="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition shadow-sm"
                 title="Lưu lại toàn bộ thuộc tính đã chỉnh sửa thành file IFC mới">
                 <i class="ph-bold ph-floppy-disk text-base"></i>
                 <span class="hidden md:inline">Lưu file IFC</span>
@@ -109,22 +109,22 @@
             <!-- NÚT CROP BOX (SECTION BOX) VỚI TAY CẦM MŨI TÊN 6 PHÍA -->
             <button @click="toggleCropBox" title="Bật/Tắt Hộp cắt CropBox (Tay cầm mũi tên 6 mặt di chuyển từng phía độc lập)"
                 :class="isCropBoxActive ? 'bg-cyan-600 text-white border-cyan-400 ring-2 ring-cyan-500/30' : 'bg-slate-800 border-slate-700/50 text-slate-300 hover:bg-slate-700'"
-                class="p-2 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 transition border shadow-sm">
+                class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition border shadow-sm">
                 <i class="ph-bold ph-scissors text-base text-cyan-300"></i>
-                <span class="hidden lg:inline">CropBox</span>
+                <span class="hidden lg:inline">[C]ropBox</span>
             </button>
 
             <!-- Nút Viền đen mỏng (Edge Outline) -->
             <button @click="toggleEdges" title="Bật/Tắt viền đen mỏng quanh mép cấu kiện (Edges)"
                 :class="showEdges ? 'bg-amber-600/30 border-amber-500 text-amber-300' : 'bg-slate-800 border-slate-700/50 text-slate-300 hover:bg-slate-700'"
-                class="p-2 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 transition border">
+                class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition border">
                 <i class="ph-bold ph-square text-base"></i>
                 <span class="hidden lg:inline">Viền mép</span>
             </button>
 
             <!-- Nút Căn giữa (Fit to View): TỰ ĐỘNG ZOOM VÀO ĐỐI TƯỢNG ĐANG CHỌN -->
             <button @click="fitCameraToTarget" :title="selectedMeshes.length > 0 ? 'Zoom căn giữa đối tượng đang chọn' : 'Căn giữa toàn bộ mô hình'"
-                class="p-2 sm:px-3 sm:py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium flex items-center gap-1.5 transition border border-slate-700/50">
+                class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium flex items-center gap-1.5 transition border border-slate-700/50">
                 <i class="ph-bold ph-corners-out text-base text-blue-400"></i>
                 <span class="hidden lg:inline">{{ selectedMeshes.length > 0 ? 'Zoom Chọn' : 'Căn giữa' }}</span>
             </button>
@@ -132,14 +132,14 @@
             <!-- Toggle Panel Trái -->
             <button @click="showLeftPanel = !showLeftPanel" title="Bảng quản lý lớp cấu kiện & nhóm"
                 :class="showLeftPanel ? 'bg-blue-600/20 border-blue-500 text-blue-300' : 'bg-slate-800 border-slate-700/50 text-slate-300 hover:bg-slate-700'"
-                class="p-2 rounded-lg text-xs font-medium transition border">
+                class="p-1.5 rounded-md text-[11px] font-medium transition border">
                 <i class="ph-bold ph-sidebar-simple text-base"></i>
             </button>
 
             <!-- Toggle Panel Phải -->
-            <button @click="showRightPanel = !showRightPanel" title="Bảng thuộc tính & chỉnh sửa"
+            <button @click="togglePropertiesPanel" title="Bảng thuộc tính & chỉnh sửa"
                 :class="showRightPanel ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-400'"
-                class="p-2 rounded-lg border border-slate-700/50 hover:bg-slate-700 transition">
+                class="p-1.5 rounded-md border border-slate-700/50 hover:bg-slate-700 transition">
                 <i class="ph-bold ph-info text-base"></i>
             </button>
         </div>
@@ -157,38 +157,39 @@
                     :class="leftActiveTab === 'display' ? 'bg-slate-800 text-blue-400 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[10px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-sliders"></i>
-                    <span>Display</span>
+                    <span class="text-[#90EE90] font-bold">Display</span>
                 </button>
                 <button @click="leftActiveTab = 'groups'" 
                     :class="leftActiveTab === 'groups' ? 'bg-slate-800 text-amber-400 border-b-2 border-amber-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[10px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-tree-structure"></i>
-                    <span>Groups</span>
+                    <span class="text-[#90EE90] font-bold">Groups</span>
                 </button>
                 <button @click="leftActiveTab = 'remove'"
                     :class="leftActiveTab === 'remove' ? 'bg-slate-800 text-rose-400 border-b-2 border-rose-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[10px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-trash"></i>
-                    <span>Remove</span>
+                    <span class="text-[#90EE90] font-bold">Remove</span>
                     <span v-if="deletedItems.length" class="rounded-full bg-rose-900/70 px-1">{{ deletedItems.length }}</span>
                 </button>
                 <button @click="leftActiveTab = 'export'"
                     :class="leftActiveTab === 'export' ? 'bg-slate-800 text-emerald-400 border-b-2 border-emerald-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[9px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-export"></i>
-                    <span>Export</span>
+                    <span class="text-[#90EE90] font-bold">Export</span>
                 </button>
                 <button @click="leftActiveTab = 'combine'"
                     :class="leftActiveTab === 'combine' ? 'bg-slate-800 text-cyan-400 border-b-2 border-cyan-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[9px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-files"></i>
-                    <span>Combine</span>
+                    <span class="text-[#90EE90] font-bold">Combine</span>
+                    <span v-if="sourceFiles.length" class="rounded-full bg-cyan-900/70 px-1 text-cyan-200">{{ sourceFiles.length }}</span>
                 </button>
                 <button @click="leftActiveTab = 'transport'"
                     :class="leftActiveTab === 'transport' ? 'bg-slate-800 text-sky-400 border-b-2 border-sky-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[8px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-arrows-out-cardinal"></i>
-                    <span>Transport</span>
+                    <span class="text-[#90EE90] font-bold">Transport</span>
                 </button>
             </div>
 
@@ -726,6 +727,59 @@
                 </div>
             </div>
 
+            <div v-if="showIntroPanel" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+                style="z-index: 10000" @click.self="closeIntroPanel">
+                <section class="w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-700/80 bg-slate-900 shadow-2xl">
+                    <div class="relative overflow-hidden border-b border-slate-800 px-6 py-5 sm:px-8">
+                        <div class="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-blue-500/10 blur-2xl"></div>
+                        <div class="absolute -left-12 bottom-[-5rem] h-40 w-40 rounded-full bg-emerald-500/10 blur-2xl"></div>
+                        <div class="relative flex items-start gap-4">
+                            <div class="shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center shadow-lg">
+                                <i class="ph-bold ph-cube text-2xl text-white"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-400">{{ introPanelContent.badge }}</div>
+                                <h2 class="text-xl sm:text-2xl font-bold text-white">{{ introPanelContent.title }}</h2>
+                                <p class="mt-2 max-w-2xl text-xs sm:text-sm leading-relaxed text-slate-300">{{ introPanelContent.subtitle }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-3 p-4 sm:grid-cols-2 sm:p-6">
+                        <article v-for="feature in introPanelContent.features" :key="feature.title"
+                            class="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                            <div class="flex items-center gap-2 text-emerald-400">
+                                <i :class="`ph-bold ${feature.icon}`" class="text-lg"></i>
+                                <h3 class="text-sm font-bold text-slate-100">{{ feature.title }}</h3>
+                            </div>
+                            <p class="mt-2 text-xs leading-relaxed text-slate-400">{{ feature.text }}</p>
+                        </article>
+                    </div>
+
+                    <div class="grid gap-3 px-4 pb-4 sm:grid-cols-2 sm:px-6">
+                        <article class="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-blue-300">{{ introPanelContent.advantageTitle }}</h3>
+                            <p class="mt-2 text-xs leading-relaxed text-slate-300">{{ introPanelContent.advantageText }}</p>
+                        </article>
+                        <article class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-amber-300">{{ introPanelContent.roadmapTitle }}</h3>
+                            <p class="mt-2 text-xs leading-relaxed text-slate-300">{{ introPanelContent.roadmapText }}</p>
+                        </article>
+                    </div>
+
+                    <div class="sticky bottom-0 flex items-center justify-between border-t border-slate-800 bg-slate-900 px-4 py-3 sm:px-6">
+                        <label class="flex items-center gap-2 text-[11px] text-slate-400">
+                            <input type="checkbox" v-model="dontShowIntroAgain" class="rounded border-slate-600 bg-slate-950 text-emerald-500">
+                            Không hiển thị lại
+                        </label>
+                        <button type="button" @click="closeIntroPanel"
+                            class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-lg hover:bg-emerald-500">
+                            Bắt đầu sử dụng
+                        </button>
+                    </div>
+                </section>
+            </div>
+
             <div v-if="showTransportProfileModal" class="fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4">
                 <form @submit.prevent="saveTransportProfile" class="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-4 shadow-2xl space-y-3">
                     <h3 class="text-sm font-bold text-slate-100">Lưu bộ tọa độ</h3>
@@ -946,7 +1000,8 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <button v-if="selectedObject && isEditingAttributes" @click="saveAttributeChanges" 
-                        class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded flex items-center gap-1 font-medium transition">
+                        :disabled="!hasAttributeChanges"
+                        class="text-xs bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-2 py-1 rounded flex items-center gap-1 font-medium transition">
                         <i class="ph-bold ph-check"></i> Lưu sửa
                     </button>
                     <button v-if="selectedMeshes.length > 0" @click="clearSelection" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 bg-slate-800 px-2 py-1 rounded">
@@ -1027,7 +1082,8 @@
 
                         <div class="pt-1 flex gap-2">
                             <button @click="saveAttributeChanges" 
-                                class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition shadow">
+                                :disabled="!hasAttributeChanges"
+                                class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-semibold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition shadow">
                                 <i class="ph-bold ph-check"></i>
                                 <span>Áp dụng vào IFC</span>
                             </button>
@@ -1258,9 +1314,66 @@
         '#e11d48', '#0284c7', '#d97706', '#a855f7', '#64748b'
     ];
 
+    // Chỉnh sửa nội dung banner giới thiệu ngay tại đây để cập nhật văn bản cho các lần ra mắt tiếp theo.
+    const INTRO_PANEL_CONTENT = {
+        badge: 'IFC BIM Editor',
+        title: 'Trình xem và chỉnh sửa IFC dành cho kết cấu',
+        subtitle: 'Không chỉ xem mô hình: công cụ được xây dựng để kiểm tra, chỉnh sửa và chuẩn bị dữ liệu BIM ngay trong trình duyệt.',
+        features: [
+            { icon: 'ph-cube-transparent', title: 'View 3D chuyên sâu', text: 'Xoay, soi, lọc và chọn từng cấu kiện với mô hình IFC thực tế.' },
+            { icon: 'ph-intersect', title: 'CropBox chính xác', text: 'Kiểm tra lát cắt, điều chỉnh từng mặt và tập trung vào vùng quan tâm.' },
+            { icon: 'ph-pencil-simple-line', title: 'Chỉnh sửa Attributes', text: 'Cập nhật Name, ObjectType, Tag, Description và lưu thành IFC mới.' },
+            { icon: 'ph-stack', title: 'Combine nhiều file IFC', text: 'Gộp, quản lý và xuất nhiều mô hình trong cùng một view 3D.' }
+        ],
+        advantageTitle: 'Vượt trội hơn viewer thông thường',
+        advantageText: 'Có thể đánh dấu cấu kiện, quản lý Remove/Restore, phân nhóm, soi thép X-Ray, transport tọa độ và xuất lại file đã chỉnh sửa.',
+        roadmapTitle: 'Định hướng phát triển',
+        roadmapText: 'Nền tảng sẵn sàng mở rộng kiểm tra va chạm, hệ thống đo đạt, thông tin khối lượng và các công cụ QC chuyên biệt.'
+    };
+
     createApp({
         setup() {
             const canvasContainer = ref(null);
+            let canvasResizeObserver = null;
+            let lastCanvasWidth = 0;
+            let lastCanvasHeight = 0;
+            let uiAudioContext = null;
+            const playUiPop = (frequencyOrEvent = 620) => {
+                const frequency = typeof frequencyOrEvent === 'number' ? frequencyOrEvent : 620;
+                try {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioContextClass) return;
+                    if (!uiAudioContext) uiAudioContext = new AudioContextClass();
+                    if (uiAudioContext.state === 'suspended') uiAudioContext.resume();
+
+                    const now = uiAudioContext.currentTime;
+                    const oscillator = uiAudioContext.createOscillator();
+                    const gain = uiAudioContext.createGain();
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(frequency, now);
+                    oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.72, now + 0.035);
+                    gain.gain.setValueAtTime(0.0001, now);
+                    gain.gain.exponentialRampToValueAtTime(0.025, now + 0.006);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
+                    oscillator.connect(gain);
+                    gain.connect(uiAudioContext.destination);
+                    oscillator.start(now);
+                    oscillator.stop(now + 0.06);
+                } catch (error) {
+                    console.warn('Không thể phát âm thanh giao diện:', error);
+                }
+            };
+            const introPanelContent = INTRO_PANEL_CONTENT;
+            const introPanelStorageKey = 'ifc-editor-intro-dismissed';
+            const showIntroPanel = ref(false);
+            const dontShowIntroAgain = ref(false);
+            const closeIntroPanel = () => {
+                showIntroPanel.value = false;
+                if (dontShowIntroAgain.value) {
+                    try { localStorage.setItem(introPanelStorageKey, 'true'); }
+                    catch (error) { console.warn('Không thể lưu trạng thái ẩn banner giới thiệu:', error); }
+                }
+            };
             const axisGizmoXLine = ref(null);
             const axisGizmoYLine = ref(null);
             const axisGizmoZLine = ref(null);
@@ -1320,11 +1433,15 @@
 
             // Tab Panels
             const showLeftPanel = ref(true);
-            const showRightPanel = ref(true);
+            const showRightPanel = ref(false);
             const leftActiveTab = ref('groups');
             const leftPanelWidth = ref(320);
             const rightPanelWidth = ref(384);
             let panelResizeState = null;
+            const togglePropertiesPanel = () => {
+                if (!showRightPanel.value && selectedMeshes.value.length === 0) return;
+                showRightPanel.value = !showRightPanel.value;
+            };
             const getPanelWidthLimit = (side) => {
                 const otherPanelWidth = side === 'left'
                     ? (showRightPanel.value ? rightPanelWidth.value : 0)
@@ -1351,7 +1468,6 @@
                 ));
                 if (panelResizeState.side === 'left') leftPanelWidth.value = width;
                 else rightPanelWidth.value = width;
-                nextTick(onWindowResize);
             };
             const endPanelResize = () => {
                 panelResizeState = null;
@@ -1359,7 +1475,6 @@
             const adjustPanelWidth = (side, delta) => {
                 const width = side === 'left' ? leftPanelWidth : rightPanelWidth;
                 width.value = Math.max(240, Math.min(getPanelWidthLimit(side), width.value + delta));
-                nextTick(onWindowResize);
             };
             const groupCriterion = ref('name');
             const groupSearchQuery = ref('');
@@ -1397,6 +1512,13 @@
             const hoveredType = ref('');
             const faultyCount = ref(0);
             const editHistoryCount = ref(0);
+            const hasUnsavedChanges = ref(false);
+            const attributeBaseline = reactive({
+                Name: '',
+                ObjectType: '',
+                Tag: '',
+                Description: ''
+            });
             
             const stats = reactive({ meshes: 0, rebarCount: 0 });
             
@@ -1424,6 +1546,12 @@
                 Tag: '',
                 Description: ''
             });
+            const hasAttributeChanges = computed(() =>
+                editableAttributes.Name !== attributeBaseline.Name ||
+                editableAttributes.ObjectType !== attributeBaseline.ObjectType ||
+                editableAttributes.Tag !== attributeBaseline.Tag ||
+                editableAttributes.Description !== attributeBaseline.Description
+            );
 
             const allGroups = reactive({
                 pos: [],
@@ -2086,6 +2214,9 @@
 
                 const width = container.clientWidth;
                 const height = container.clientHeight;
+                if (width === lastCanvasWidth && height === lastCanvasHeight) return;
+                lastCanvasWidth = width;
+                lastCanvasHeight = height;
                 const aspect = width / height;
 
                 // 1. Phối cảnh Perspective Camera
@@ -2152,6 +2283,7 @@
                 modelGroup.add(edgesGroup);
                 modelGroup.add(batchGroup);
                 modelGroup.add(overlayGroup);
+                cropGroup.renderOrder = 10000;
                 scene.add(cropGroup);
 
                 // Khởi tạo CropBox 6 mặt độc lập kèm 6 mũi tên
@@ -2249,7 +2381,7 @@
 
                 controls.object = camera;
                 controls.update();
-                showToast('Chế độ Camera', isOrthographic.value ? 'Đã đổi sang Orthographic (Hình chiếu trục đo)' : 'Đã đổi sang Perspective (Phối cảnh)', 'success');
+                // showToast('Chế độ Camera', isOrthographic.value ? 'Đã đổi sang Orthographic (Hình chiếu trục đo)' : 'Đã đổi sang Perspective (Phối cảnh)', 'success');
             };
 
             const setViewDirection = (direction) => {
@@ -2323,18 +2455,44 @@
                         0.4,
                         0.22
                     );
+                    arrowHelper.frustumCulled = false;
+                    arrowHelper.line.frustumCulled = false;
+                    arrowHelper.cone.frustumCulled = false;
                     arrowHelper.line.material.depthTest = false;
                     arrowHelper.cone.material.depthTest = false;
-                    arrowHelper.line.renderOrder = 10;
-                    arrowHelper.cone.renderOrder = 10;
+                    arrowHelper.line.material.depthWrite = false;
+                    arrowHelper.cone.material.depthWrite = false;
+                    arrowHelper.line.renderOrder = 10000;
+                    arrowHelper.cone.renderOrder = 10000;
+                    // Viền đầu mũi tên luôn nằm trên mô hình, kể cả khi mô hình đang ở chế độ X-Ray.
+                    const arrowOutline = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(arrowHelper.cone.geometry, 20),
+                        new THREE.LineBasicMaterial({
+                            color: f.color,
+                            depthTest: false,
+                            depthWrite: false,
+                            transparent: false
+                        })
+                    );
+                    arrowOutline.renderOrder = 10001;
+                    arrowOutline.position.copy(arrowHelper.cone.position);
+                    arrowOutline.quaternion.copy(arrowHelper.cone.quaternion);
+                    arrowOutline.scale.copy(arrowHelper.cone.scale);
+                    arrowHelper.add(arrowOutline);
                     handleObj.add(arrowHelper);
 
-                    // Khối tương tác vô hình bám đúng thân + đầu mũi tên (cone bán kính 0.22, dài 0.9), không lấn sang vùng xoay view
-                    const hitGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.9, 8, 1, false);
-                    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+                    // Vùng tương tác nhỏ hơn thân mũi tên để tránh chiếm vùng xoay view.
+                    const hitGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.225, 8, 1, false);
+                    const hitMat = new THREE.MeshBasicMaterial({
+                        transparent: true,
+                        opacity: 0,
+                        depthWrite: false,
+                        depthTest: false
+                    });
                     const hitMesh = new THREE.Mesh(hitGeo, hitMat);
                     hitMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), f.normal);
-                    hitMesh.position.copy(f.normal).multiplyScalar(0.45);
+                    hitMesh.position.copy(f.normal).multiplyScalar(0.1125);
+                    hitMesh.renderOrder = 1001;
                     handleObj.add(hitMesh);
 
                     handleObj.userData = {
@@ -2343,7 +2501,8 @@
                         isMin: f.isMin,
                         normal: f.normal.clone(),
                         arrowColor: f.color,
-                        arrowHelper
+                        arrowHelper,
+                        arrowOutline
                     };
 
                     cropGroup.add(handleObj);
@@ -2358,6 +2517,7 @@
                 const arrow = hoveredCropHandle.userData.arrowHelper;
                 arrow.line.material.color.setHex(hoveredCropHandle.userData.arrowColor);
                 arrow.cone.material.color.setHex(hoveredCropHandle.userData.arrowColor);
+                hoveredCropHandle.userData.arrowOutline.material.color.setHex(hoveredCropHandle.userData.arrowColor);
                 arrow.scale.setScalar(1);
                 hoveredCropHandle = null;
             };
@@ -2385,6 +2545,7 @@
                     const arrow = handle.userData.arrowHelper;
                     arrow.line.material.color.setHex(0xf8fafc);
                     arrow.cone.material.color.setHex(0xf8fafc);
+                    handle.userData.arrowOutline.material.color.setHex(0xf8fafc);
                     arrow.scale.setScalar(1.2);
                 }
                 return handle;
@@ -2463,7 +2624,6 @@
 
                     applyClippingPlanesToMaterials(true);
                     syncCropBoxGeometryAndPlanes();
-                    showToast('Đã bật CropBox', 'Kéo bất kỳ mũi tên nào trong 6 mặt để di chuyển mặt đó độc lập!', 'success');
                 } else {
                     cropGroup.visible = false;
                     cropDragHandle = null;
@@ -2500,7 +2660,7 @@
                 cropBounds.maxZ = selBox.max.z + pad;
 
                 syncCropBoxGeometryAndPlanes();
-                showToast('CropBox', `Đã cắt ôm sát nhóm ${selectedMeshes.value.length} đối tượng đang chọn.`, 'success');
+                // showToast('CropBox', `Đã cắt ôm sát nhóm ${selectedMeshes.value.length} đối tượng đang chọn.`, 'success');
             };
 
             // RESET CROPBOX ÔM TRỌN TOÀN BỘ MÔ HÌNH
@@ -2762,7 +2922,10 @@
                 if (files.length === 0) return;
                 const ifcFiles = files.filter(file => file.name.toLowerCase().endsWith('.ifc'));
                 if (ifcFiles.length !== files.length) showToast('Bỏ qua tệp không hợp lệ', 'Chỉ nhận tệp có định dạng .ifc.');
-                for (const file of ifcFiles) await loadIfcFile(file, false);
+                for (let index = 0; index < ifcFiles.length; index++) {
+                    const replaceCurrent = index === 0 && isSampleModel.value;
+                    await loadIfcFile(ifcFiles[index], replaceCurrent);
+                }
             };
 
             const loadIfcFile = async (file, replaceCurrent) => {
@@ -2792,6 +2955,7 @@
                         clearCurrentModel();
                         psetCache.clear();
                         editHistoryCount.value = 0;
+                        hasUnsavedChanges.value = false;
                     }
 
                     const uint8Array = new Uint8Array(await file.arrayBuffer());
@@ -3464,6 +3628,7 @@
                     line.visible = showEdges.value && parentMesh && parentMesh.visible && !isRebarOnly.value;
                 });
                 exportListVersion.value++;
+                hasUnsavedChanges.value = false;
             };
 
             // --- 6. CÁC TÙY CHỌN HIỂN THỊ ---
@@ -3526,6 +3691,7 @@
                         deletedItems.value.push(item);
                     }
                 });
+                if (itemsById.size > 0) hasUnsavedChanges.value = true;
                 updateAllMeshesVisibility();
                 clearSelection();
                 showToast('Đã đánh dấu xóa', `${itemsById.size} cấu kiện sẽ bị xóa khi xuất IFC.`, 'success');
@@ -3534,6 +3700,9 @@
             const restoreRemovedItem = (key) => {
                 pendingDeletedExpressIDs.delete(key);
                 deletedItems.value = deletedItems.value.filter(item => item.key !== key);
+                if (deletedItems.value.length === 0 && editHistoryCount.value === 0) {
+                    hasUnsavedChanges.value = false;
+                }
                 updateAllMeshesVisibility();
             };
 
@@ -3687,7 +3856,7 @@
                     controls.update();
                 }
 
-                showToast('Zoom chọn', `Đã căn giữa ${selectedMeshes.value.length} đối tượng đang chọn.`, 'success');
+                // showToast('Zoom chọn', `Đã căn giữa ${selectedMeshes.value.length} đối tượng đang chọn.`, 'success');
             };
 
             const fitCameraToModel = () => {
@@ -3964,6 +4133,7 @@
 
             const handleMeshSelection = (mesh, isMultiSelect = false) => {
                 mesh = toRaw(mesh);
+                playUiPop(700);
                 const objectMeshes = getObjectMeshes(mesh);
                 if (!isMultiSelect) {
                     selectedMeshes.value = [...objectMeshes];
@@ -3974,6 +4144,7 @@
                         showPropertiesForMesh(toRaw(selectedMeshes.value[selectedMeshes.value.length - 1]));
                     } else {
                         selectedObject.value = null;
+                        showRightPanel.value = false;
                     }
                 } else {
                     objectMeshes.forEach(member => {
@@ -4027,6 +4198,10 @@
                 editableAttributes.ObjectType = mesh.userData.objectType || '';
                 editableAttributes.Tag = mesh.userData.tag || '';
                 editableAttributes.Description = mesh.userData.description || '';
+                attributeBaseline.Name = editableAttributes.Name;
+                attributeBaseline.ObjectType = editableAttributes.ObjectType;
+                attributeBaseline.Tag = editableAttributes.Tag;
+                attributeBaseline.Description = editableAttributes.Description;
 
                 if (mesh.userData.isDemo) {
                     selectedObject.value = {
@@ -4259,7 +4434,7 @@
                         if (hoveredMesh && !isMeshSelected(hoveredMesh)) restoreMeshMaterial(hoveredMesh);
                         hoveredMesh = null;
                         hoveredType.value = '';
-                        renderer.domElement.style.cursor = 'pointer';
+                        renderer.domElement.style.cursor = 'move';
                         return;
                     }
                 } else {
@@ -4302,7 +4477,7 @@
                 if (cropDragHandle) {
                     cropDragHandle = null;
                     controls.enabled = true;
-                    renderer.domElement.style.cursor = isCropBoxActive.value && updateCropHandleHover(event) ? 'pointer' : 'default';
+                    renderer.domElement.style.cursor = isCropBoxActive.value && updateCropHandleHover(event) ? 'move' : 'default';
                     updateEdgesVisibility();
                     return;
                 }
@@ -4416,14 +4591,18 @@
                     showPropertiesForMesh(selectedMeshes.value[selectedMeshes.value.length - 1]);
                     showRightPanel.value = true;
                     revealMeshInGroups(selectedMeshes.value[selectedMeshes.value.length - 1]);
-                    showToast('Đã chọn theo vùng', `Đã chọn ${selectedMeshes.value.length} cấu kiện trong vùng kéo chuột.`, 'success');
+                    // showToast('Đã chọn theo vùng', `Đã chọn ${selectedMeshes.value.length} cấu kiện trong vùng kéo chuột.`, 'success');
+                } else {
+                    showRightPanel.value = false;
                 }
             };
 
             const clearSelection = () => {
+                if (selectedMeshes.value.length > 0) playUiPop(520);
                 selectedMeshes.value = [];
                 selectedObject.value = null;
                 isEditingAttributes.value = false;
+                showRightPanel.value = false;
                 updateSelectionDimmingEffect(true);
             };
 
@@ -4474,7 +4653,7 @@
                         }
                     });
                     updateSelectionDimmingEffect();
-                    showToast('Select Similar', `Đã chọn ${selectedMeshes.value.length} đối tượng có cùng ${contextMenu.attrKey} = "${contextMenu.attrValue}"`, 'success');
+                    // showToast('Select Similar', `Đã chọn ${selectedMeshes.value.length} đối tượng có cùng ${contextMenu.attrKey} = "${contextMenu.attrValue}"`, 'success');
                 } else if (action === 'showSimilar') {
                     let count = 0;
                     modelGroup.children.forEach(mesh => {
@@ -4485,7 +4664,7 @@
                         }
                     });
                     updateEdgesVisibility();
-                    showToast('Show Similar', `Đang chỉ hiển thị ${count} đối tượng tương tự`, 'success');
+                    // showToast('Show Similar', `Đang chỉ hiển thị ${count} đối tượng tương tự`, 'success');
                 } else if (action === 'filterWithAttribute') {
                     leftActiveTab.value = 'groups';
                     groupSearchQuery.value = contextMenu.attrValue;
@@ -4496,6 +4675,7 @@
             // LƯU THUỘC TÍNH VÀ XUẤT FILE
             const saveAttributeChanges = () => {
                 if (!selectedObject.value || selectedMeshes.value.length === 0) return;
+                if (!hasAttributeChanges.value) return;
 
                 selectedMeshes.value.forEach(mesh => {
                     const expressID = mesh.userData.expressID;
@@ -4515,11 +4695,17 @@
 
                                 ifcAPI.WriteLine(mesh.userData.sourceModelID, line);
                                 editHistoryCount.value++;
+                                hasUnsavedChanges.value = true;
                             }
                         } catch (err) {}
                     }
                 });
 
+                attributeBaseline.Name = editableAttributes.Name;
+                attributeBaseline.ObjectType = editableAttributes.ObjectType;
+                attributeBaseline.Tag = editableAttributes.Tag;
+                attributeBaseline.Description = editableAttributes.Description;
+                hasUnsavedChanges.value = true;
                 buildAllGroupingCollections();
                 showToast('Đã lưu thuộc tính', `Đã cập nhật cho ${selectedMeshes.value.length} đối tượng.`, 'success');
             };
@@ -4541,6 +4727,8 @@
                     loadingText.value = 'Đang tạo IFC kết hợp và áp dụng danh sách xóa...';
                     const data = createFilteredIfcData('edited');
                     downloadIfcData(data, sourceFiles.value.length > 1 ? '_combined_edited' : '_edited');
+                    editHistoryCount.value = 0;
+                    hasUnsavedChanges.value = false;
                     showToast('Xuất tệp thành công!', `Đã lưu IFC với ${pendingDeletedExpressIDs.size} cấu kiện đã xóa.`, 'success');
 
                 } catch (err) {
@@ -4815,6 +5003,10 @@
             const handleKeyDown = (event) => {
                 if (event.key === 'Shift') isShiftPressed.value = true;
                 if (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) return;
+                if (!event.repeat && (event.key === 'c' || event.key === 'C')) {
+                    event.preventDefault();
+                    toggleCropBox();
+                }
                 if (event.key === 'x' || event.key === 'X') toggleXRayMode();
                 if (event.code === 'Space' && event.target.tagName !== 'BUTTON' && selectedMeshes.value.length > 0) {
                     event.preventDefault();
@@ -4858,6 +5050,13 @@
             onMounted(async () => {
                 initThreeJS();
                 loadTransportProfiles();
+                canvasResizeObserver = new ResizeObserver(() => nextTick(onWindowResize));
+                if (canvasContainer.value) canvasResizeObserver.observe(canvasContainer.value);
+                try {
+                    showIntroPanel.value = localStorage.getItem(introPanelStorageKey) !== 'true';
+                } catch (error) {
+                    showIntroPanel.value = true;
+                }
                 window.addEventListener('keydown', handleKeyDown);
                 window.addEventListener('keyup', handleKeyUp);
                 await initWebIFC();
@@ -4865,6 +5064,7 @@
 
             onBeforeUnmount(() => {
                 cancelAnimationFrame(animationFrameId);
+                if (canvasResizeObserver) canvasResizeObserver.disconnect();
                 window.removeEventListener('resize', onWindowResize);
                 window.removeEventListener('keydown', handleKeyDown);
                 window.removeEventListener('keyup', handleKeyUp);
@@ -4880,6 +5080,11 @@
 
             return {
                 canvasContainer,
+                introPanelContent,
+                showIntroPanel,
+                dontShowIntroAgain,
+                closeIntroPanel,
+                playUiPop,
                 axisGizmoXLine,
                 axisGizmoYLine,
                 axisGizmoZLine,
@@ -4923,6 +5128,7 @@
                 undoTransport,
                 showLeftPanel,
                 showRightPanel,
+                togglePropertiesPanel,
                 leftPanelWidth,
                 rightPanelWidth,
                 startPanelResize,
@@ -4948,6 +5154,7 @@
                 hoveredType,
                 faultyCount,
                 editHistoryCount,
+                hasUnsavedChanges,
                 stats,
                 selectedMeshes,
                 selectedObject,
@@ -4957,6 +5164,7 @@
                 visibleExportItems,
                 isEditingAttributes,
                 editableAttributes,
+                hasAttributeChanges,
                 allGroups,
                 filteredGroups,
                 isBoxSelecting,
