@@ -19,6 +19,7 @@
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
             "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
             "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.8/build/index.module.js",
+            "three-bvh-csg": "https://cdn.jsdelivr.net/npm/three-bvh-csg@0.0.17/build/index.module.js",
             "web-ifc": "https://cdn.jsdelivr.net/npm/web-ifc@0.0.66/web-ifc-api.js"
         }
     }
@@ -55,6 +56,10 @@
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #475569;
+        }
+        .left-tabs > button {
+            flex: 1 1 4.5rem;
+            min-width: 0;
         }
         .selectBoxOverlay {
             border: 1.5px dashed #0284c7;
@@ -152,7 +157,7 @@
         <aside v-show="showLeftPanel" :style="{ width: `${leftPanelWidth}px` }"
             class="min-w-[240px] max-w-[640px] bg-slate-900 border-r border-slate-800 flex flex-col z-20 shrink-0 shadow-2xl select-none">
             
-            <div class="px-1 py-1 border-b border-slate-800 grid grid-cols-4 items-center bg-slate-900/90 gap-0.5">
+            <div class="px-1 py-1 border-b border-slate-800 left-tabs flex flex-wrap items-stretch bg-slate-900/90 gap-0.5">
                 <button @click="leftActiveTab = 'display'" 
                     :class="leftActiveTab === 'display' ? 'bg-slate-800 text-blue-400 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[10px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
@@ -190,6 +195,13 @@
                     class="py-2 text-[8px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-arrows-out-cardinal"></i>
                     <span class="text-[#90EE90] font-bold">Transport</span>
+                </button>
+                <button @click="leftActiveTab = 'clash'"
+                    :class="leftActiveTab === 'clash' ? 'bg-slate-800 text-blue-300 border-b-2 border-blue-400' : 'text-slate-400 hover:text-slate-200'"
+                    class="py-2 text-[8px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
+                    <i class="ph-bold ph-intersect-three"></i>
+                    <span class="text-[#90EE90] font-bold">Clash</span>
+                    <span v-if="clashCount" class="rounded-full bg-blue-900/70 px-1 text-blue-200">{{ clashCount }}</span>
                 </button>
             </div>
 
@@ -727,6 +739,74 @@
                 </div>
             </div>
 
+            <div v-show="leftActiveTab === 'clash'" class="flex-1 flex flex-col overflow-hidden">
+                <div class="p-3 border-b border-slate-800 bg-slate-950/40 space-y-3">
+                    <div>
+                        <h3 class="text-xs font-bold text-blue-300 flex items-center gap-2"><i class="ph-bold ph-intersect-three"></i> Kiểm tra xung đột mô hình</h3>
+                        <p class="mt-1 text-[10px] leading-relaxed text-slate-400">Bấm một cặp clash để zoom. Khối được chọn sẽ nhấp nháy vàng/đỏ rồi giữ màu vàng, có viền nét đứt và nhãn chỉ vị trí.</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="min-w-0 space-y-1">
+                            <span class="block text-[10px] font-semibold text-slate-400">Loại cấu kiện A</span>
+                            <select v-model="clashTypeA" class="w-full min-w-0 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-[10px] text-slate-200 outline-none focus:border-blue-500">
+                                <option value="*">Tất cả loại</option>
+                                <option v-for="type in clashTypeOptions" :key="type.value" :value="type.value">{{ type.label }}</option>
+                            </select>
+                        </label>
+                        <label class="min-w-0 space-y-1">
+                            <span class="block text-[10px] font-semibold text-slate-400">Loại cấu kiện B</span>
+                            <select v-model="clashTypeB" class="w-full min-w-0 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-[10px] text-slate-200 outline-none focus:border-blue-500">
+                                <option value="*">Tất cả loại</option>
+                                <option v-for="type in clashTypeOptions" :key="type.value" :value="type.value">{{ type.label }}</option>
+                            </select>
+                        </label>
+                    </div>
+                    <label class="block space-y-1">
+                        <span class="flex items-center justify-between text-[10px] font-semibold text-slate-400"><span>Dung sai kiểm tra</span><span class="text-blue-300">mm</span></span>
+                        <input v-model.number="clashToleranceMm" type="number" min="0" max="1000" step="0.5"
+                            class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs text-slate-100 outline-none focus:border-blue-500" />
+                        <span class="block text-[9px] leading-relaxed text-slate-500">0 = chỉ tìm phần giao thực tế. Dung sai lớn hơn 0 sẽ nới mỗi cấu kiện một nửa giá trị để phát hiện cả khe hở nhỏ.</span>
+                    </label>
+                    <button @click="onClashButtonClick" :disabled="!clashBusy && (isLoading || stats.meshes < 2)"
+                        :title="clashBusy ? 'Bấm lần nữa để hủy kiểm tra' : ''"
+                        class="relative w-full p-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center justify-center gap-2">
+                        <svg v-if="clashBusy" class="pointer-events-none absolute inset-0 w-full h-full overflow-visible" aria-hidden="true">
+                            <rect x="1.5" y="1.5" rx="8" pathLength="100" fill="none" stroke="#67e8f9" stroke-width="3"
+                                :style="{ width: 'calc(100% - 3px)', height: 'calc(100% - 3px)', strokeDasharray: `${clashProgress * 100} 100` }"></rect>
+                        </svg>
+                        <i class="ph-bold ph-magnifying-glass"></i>{{ clashBusy ? `Đang kiểm tra ${Math.round(clashProgress * 100)}% · bấm để hủy` : 'Check Clash Model' }}
+                    </button>
+                    <button @click="toggleClashPairObjects" :disabled="!selectedClashId"
+                        :class="showClashPairObjects ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'"
+                        class="w-full p-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-semibold flex items-center justify-center gap-2">
+                        <i class="ph-bold ph-eye"></i>{{ showClashPairObjects ? 'Ẩn 2 đối tượng clash' : 'Hiện 2 đối tượng clash' }}
+                    </button>
+                    <button v-if="clashModeActive" @click="clearClashResults"
+                        class="w-full p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold">Tắt kết quả / Khôi phục mô hình</button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="rounded-lg border border-slate-800 bg-slate-900 p-2"><div class="text-[10px] text-slate-500">Cặp xung đột</div><div class="text-lg font-bold text-blue-300">{{ clashCount }}</div></div>
+                        <div class="rounded-lg border border-slate-800 bg-slate-900 p-2"><div class="text-[10px] text-slate-500">Thể tích giao nhau</div><div class="text-lg font-bold text-blue-300">{{ clashVolume.toFixed(4) }} m³</div></div>
+                    </div>
+                    <div v-if="clashError" class="rounded-lg border border-rose-800/60 bg-rose-950/30 p-2 text-[10px] text-rose-300">{{ clashError }}</div>
+                    <div v-if="clashModeActive" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-slate-300">
+                        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm border border-black bg-blue-500"></span> Khối clash</span>
+                        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm border border-slate-400"></span> Đường bao ngoài</span>
+                    </div>
+                </div>
+                <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+                    <div v-if="clashItems.length" class="px-1 pb-1 text-[9px] text-slate-500">Sắp xếp theo thể tích giao nhau: lớn nhất ở trên</div>
+                    <button v-for="(item, index) in clashItems" :key="item.id" @click="zoomToClash(item)"
+                        :class="selectedClashId === item.id ? 'border-amber-400 bg-amber-950/40 ring-1 ring-amber-500/60' : 'border-slate-800 bg-slate-800/30 hover:border-blue-500/70 hover:bg-blue-950/30'"
+                        class="w-full rounded-lg border p-2 text-left text-[10px] transition focus:outline-none focus:ring-1 focus:ring-amber-400">
+                        <div class="flex items-center justify-between gap-2"><span class="font-semibold" :class="selectedClashId === item.id ? 'text-amber-300' : 'text-blue-200'">Clash #{{ index + 1 }}</span><span class="text-slate-400">{{ item.volume.toFixed(6) }} m³</span></div>
+                        <div class="mt-1 text-slate-300">{{ item.nameA }} <span class="text-blue-400">↔</span> {{ item.nameB }}</div>
+                        <div class="mt-1 text-[9px] text-slate-500">{{ item.typeA }} ↔ {{ item.typeB }} · Bấm để zoom vùng clash</div>
+                    </button>
+                    <p v-if="clashModeActive && clashCount === 0" class="p-5 text-center text-xs text-emerald-300">Không phát hiện vùng thể tích giao nhau theo điều kiện đã chọn.</p>
+                    <p v-if="!clashModeActive && !clashBusy" class="p-5 text-center text-xs text-slate-500">Chọn loại cấu kiện A/B, dung sai rồi nhấn Check Clash Model.</p>
+                </div>
+            </div>
+
             <div v-if="showIntroPanel" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
                 style="z-index: 10000" @click.self="closeIntroPanel">
                 <section class="w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-700/80 bg-slate-900 shadow-2xl">
@@ -1242,6 +1322,7 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { TransformControls } from 'three/addons/controls/TransformControls.js';
     import { computeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+    import { Brush, Evaluator, INTERSECTION } from 'three-bvh-csg';
     import * as WebIFC from 'web-ifc';
     THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
     THREE.Mesh.prototype.raycast = acceleratedRaycast;
@@ -1435,6 +1516,21 @@
             const showLeftPanel = ref(true);
             const showRightPanel = ref(false);
             const leftActiveTab = ref('groups');
+            const clashModeActive = ref(false);
+            const clashBusy = ref(false);
+            const clashProgress = ref(0);
+            let clashCancelRequested = false;
+            const clashCount = ref(0);
+            const clashVolume = ref(0);
+            const clashError = ref('');
+            const clashItems = ref([]);
+            const selectedClashId = ref(null);
+            let selectedClashMesh = null;
+            let clashFlashInterval = null;
+            let clashFlashTimeout = null;
+            const clashTypeA = ref('*');
+            const clashTypeB = ref('*');
+            const clashToleranceMm = ref(0);
             const leftPanelWidth = ref(320);
             const rightPanelWidth = ref(384);
             let panelResizeState = null;
@@ -1577,6 +1673,7 @@
             const transportRotationAxis = new THREE.Vector3(0, 1, 0);
             const transportOperations = [];
             let modelOffset = new THREE.Vector3(0, 0, 0);
+            let modelRebaseOrigin = null;
 
             // BỘ 6 MẶT PHẲNG CẮT CROPBOX
             const clippingPlanes = [
@@ -1614,6 +1711,33 @@
             // BatchedMesh: mỗi cấu kiện là một instance trong batch theo vật liệu; mesh gốc chỉ giữ dữ liệu (layer ẩn khỏi render)
             const batchGroup = new THREE.Group();
             const overlayGroup = new THREE.Group();
+            const clashGroup = new THREE.Group();
+            clashGroup.name = 'ClashIntersectionVolumes';
+            const clashContextGroup = new THREE.Group();
+            clashContextGroup.name = 'ClashContextOutlines';
+            const clashSelectionGroup = new THREE.Group();
+            clashSelectionGroup.name = 'SelectedClashOutline';
+            const clashAnnotationGroup = new THREE.Group();
+            clashAnnotationGroup.name = 'SelectedClashAnnotation';
+            const clashPairGroup = new THREE.Group();
+            clashPairGroup.name = 'SelectedClashPairObjects';
+            const clashPairMaterialA = new THREE.MeshBasicMaterial({
+                color: 0x38bdf8, transparent: true, opacity: 0.35, side: THREE.DoubleSide,
+                depthWrite: false, toneMapped: false
+            });
+            const clashPairMaterialB = new THREE.MeshBasicMaterial({
+                color: 0xfb923c, transparent: true, opacity: 0.35, side: THREE.DoubleSide,
+                depthWrite: false, toneMapped: false
+            });
+            const showClashPairObjects = ref(false);
+            const clashContextMaterial = new THREE.LineBasicMaterial({
+                color: 0x94a3b8, transparent: true, opacity: 0.38,
+                depthTest: true, depthWrite: false, toneMapped: false
+            });
+            const clashOutlineMaterial = new THREE.LineBasicMaterial({
+                color: 0x080d16, transparent: false, opacity: 1,
+                depthTest: true, depthWrite: false, toneMapped: false
+            });
             let batchRecords = [];
             // Một đối tượng logic = tất cả mesh có cùng meshKey (cùng expressID trong một file)
             let meshesByKey = new Map();
@@ -2073,6 +2197,7 @@
             };
 
             const applyTransport = () => {
+                if (clashModeActive.value) clearClashResults();
                 if (sourceFiles.value.length === 0) {
                     showToast('Chưa có file IFC', 'Mở ít nhất một file IFC trước khi transport.');
                     return;
@@ -2285,12 +2410,18 @@
                 modelGroup.add(overlayGroup);
                 cropGroup.renderOrder = 10000;
                 scene.add(cropGroup);
+                scene.add(clashGroup);
+                scene.add(clashContextGroup);
+                scene.add(clashSelectionGroup);
+                scene.add(clashAnnotationGroup);
+                scene.add(clashPairGroup);
 
                 // Khởi tạo CropBox 6 mặt độc lập kèm 6 mũi tên
                 init6FaceCropBox();
 
                 createSampleRebarModel();
                 rebuildBatches();
+                applyClashDisplayMode();
                 applyModelOpacityToScene();
 
                 const domElem = renderer.domElement;
@@ -2311,6 +2442,7 @@
                     needsRender = false;
                     lastRenderTime = now;
                     if (isCropBoxActive.value) updateCropHandleScales();
+                    if (clashAnnotationGroup.visible) updateClashAnnotationCamera();
                     updateAxisGizmo();
                     syncBatchVisibility();
                     renderer.render(scene, camera);
@@ -3291,6 +3423,11 @@
                 const mesh = new THREE.Mesh(bufferGeo, material);
                 const matrix = new THREE.Matrix4();
                 matrix.fromArray(placedGeometry.flatTransformation);
+                // Dời gốc tương đối theo cấu kiện đầu tiên (tính bằng double) để tránh mất chính xác float32 khi model ở xa gốc tọa độ
+                if (!modelRebaseOrigin) modelRebaseOrigin = new THREE.Vector3(matrix.elements[12], matrix.elements[13], matrix.elements[14]);
+                matrix.elements[12] -= modelRebaseOrigin.x;
+                matrix.elements[13] -= modelRebaseOrigin.y;
+                matrix.elements[14] -= modelRebaseOrigin.z;
                 mesh.applyMatrix4(matrix);
 
                 mesh.userData = {
@@ -3544,6 +3681,14 @@
                 return labels[type] || 'Thực thể IFC';
             };
 
+            const clashTypeOptions = computed(() => allGroups.entity.map(group => {
+                const label = getEntityLabel(group.name);
+                return {
+                    value: group.name,
+                    label: label === 'Thực thể IFC' ? group.name : `${label} (${group.name})`
+                };
+            }));
+
             const filteredGroups = computed(() => {
                 const list = allGroups[groupCriterion.value] || [];
                 if (!groupSearchQuery.value.trim()) return list;
@@ -3622,13 +3767,519 @@
             const updateEdgesVisibility = () => {
                 requestRender();
                 if (showEdges.value && !isRebarOnly.value) ensureEdgesForVisibleMeshes();
-                edgesGroup.visible = showEdges.value;
+                edgesGroup.visible = showEdges.value && !clashModeActive.value;
                 edgesGroup.children.forEach(line => {
                     const parentMesh = line.userData.parentMesh;
                     line.visible = showEdges.value && parentMesh && parentMesh.visible && !isRebarOnly.value;
                 });
                 exportListVersion.value++;
                 hasUnsavedChanges.value = false;
+            };
+
+            // --- KIỂM TRA CLASH: khối giao đặc, phần còn lại chỉ hiển thị đường bao ---
+            const clashBlueMaterial = new THREE.MeshBasicMaterial({
+                color: 0x168bff, side: THREE.DoubleSide, transparent: false,
+                opacity: 1, depthWrite: true, depthTest: true,
+                polygonOffset: true, polygonOffsetFactor: -1, toneMapped: false
+            });
+            const clashYellowMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffd21f, side: THREE.DoubleSide, transparent: false,
+                opacity: 1, depthWrite: true, depthTest: true, toneMapped: false
+            });
+            const clashRedMaterial = new THREE.MeshBasicMaterial({
+                color: 0xef4444, side: THREE.DoubleSide, transparent: false,
+                opacity: 1, depthWrite: true, depthTest: true, toneMapped: false
+            });
+            const clearClashPairObjects = () => {
+                while (clashPairGroup.children.length) {
+                    clashPairGroup.remove(clashPairGroup.children[0]);
+                }
+            };
+            const refreshClashPairObjects = () => {
+                clearClashPairObjects();
+                const item = clashItems.value.find(entry => entry.id === selectedClashId.value);
+                if (showClashPairObjects.value && item) {
+                    [[item.sourceA, clashPairMaterialA], [item.sourceB, clashPairMaterialB]].forEach(([source, material]) => {
+                        if (!source?.geometry) return;
+                        // Dùng chung geometry gốc của cấu kiện (không dispose), chỉ đặt lại ma trận world.
+                        const pairMesh = new THREE.Mesh(source.geometry, material);
+                        pairMesh.matrixAutoUpdate = false;
+                        pairMesh.matrix.copy(source.matrixWorld);
+                        pairMesh.matrixWorld.copy(source.matrixWorld);
+                        pairMesh.frustumCulled = false;
+                        pairMesh.renderOrder = 50;
+                        clashPairGroup.add(pairMesh);
+                    });
+                }
+                requestRender();
+            };
+            const toggleClashPairObjects = () => {
+                showClashPairObjects.value = !showClashPairObjects.value;
+                refreshClashPairObjects();
+            };
+            const clearClashSelectionVisuals = () => {
+                clearClashPairObjects();
+                if (clashFlashInterval) clearInterval(clashFlashInterval);
+                if (clashFlashTimeout) clearTimeout(clashFlashTimeout);
+                clashFlashInterval = null;
+                clashFlashTimeout = null;
+                if (selectedClashMesh && selectedClashMesh.parent) {
+                    selectedClashMesh.material = clashBlueMaterial;
+                }
+                selectedClashMesh = null;
+                selectedClashId.value = null;
+                while (clashSelectionGroup.children.length) {
+                    const child = clashSelectionGroup.children[0];
+                    child.geometry?.dispose();
+                    clashSelectionGroup.remove(child);
+                }
+                while (clashAnnotationGroup.children.length) {
+                    const child = clashAnnotationGroup.children[0];
+                    child.traverse(node => {
+                        node.geometry?.dispose();
+                        if (node.material) {
+                            const materials = Array.isArray(node.material) ? node.material : [node.material];
+                            materials.forEach(material => {
+                                material.map?.dispose();
+                                material.dispose();
+                            });
+                        }
+                    });
+                    clashAnnotationGroup.remove(child);
+                }
+            };
+            const addClashLocationLabel = (item, itemIndex) => {
+                if (!item?.bounds?.min || !item?.bounds?.max) return;
+                const box = new THREE.Box3(
+                    new THREE.Vector3(...item.bounds.min),
+                    new THREE.Vector3(...item.bounds.max)
+                );
+                const size = box.getSize(new THREE.Vector3());
+                const center = box.getCenter(new THREE.Vector3());
+                const radius = Math.max(size.length() * 0.5, 0.025);
+                const anchor = new THREE.Vector3(center.x, box.max.y, center.z);
+
+                const leaderGeometry = new THREE.BufferGeometry();
+                const leader = new THREE.Line(leaderGeometry, new THREE.LineBasicMaterial({
+                    color: 0xffd21f, transparent: false, depthTest: false, depthWrite: false, toneMapped: false
+                }));
+                leader.renderOrder = 2000;
+                leader.frustumCulled = false;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.96)';
+                ctx.strokeStyle = '#facc15';
+                ctx.lineWidth = 8;
+                const radiusPx = 22;
+                ctx.beginPath();
+                ctx.moveTo(radiusPx, 4);
+                ctx.lineTo(canvas.width - radiusPx, 4);
+                ctx.quadraticCurveTo(canvas.width - 4, 4, canvas.width - 4, radiusPx);
+                ctx.lineTo(canvas.width - 4, canvas.height - radiusPx);
+                ctx.quadraticCurveTo(canvas.width - 4, canvas.height - 4, canvas.width - radiusPx, canvas.height - 4);
+                ctx.lineTo(radiusPx, canvas.height - 4);
+                ctx.quadraticCurveTo(4, canvas.height - 4, 4, canvas.height - radiusPx);
+                ctx.lineTo(4, radiusPx);
+                ctx.quadraticCurveTo(4, 4, radiusPx, 4);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.font = 'bold 54px Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#fde68a';
+                ctx.fillText(`CLASH #${itemIndex + 1}`, canvas.width / 2, canvas.height / 2 + 2);
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+                    map: texture, transparent: true, depthTest: false, depthWrite: false, toneMapped: false
+                }));
+                // Kích thước nền bám theo vùng clash, không dùng một kích thước cố định cho mọi mô hình.
+                const baseLabelWidth = THREE.MathUtils.clamp(radius * 2.25, 0.16, 1.15);
+                sprite.scale.set(baseLabelWidth, baseLabelWidth * 0.25, 1);
+                sprite.renderOrder = 2001;
+                sprite.frustumCulled = false;
+
+                const annotation = new THREE.Group();
+                annotation.add(leader, sprite);
+                annotation.userData.clashLabel = {
+                    anchor: anchor.clone(),
+                    radius,
+                    baseLabelWidth,
+                    baseOffset: Math.max(radius * 1.55, 0.14),
+                    leader,
+                    sprite
+                };
+                annotation.renderOrder = 2000;
+                annotation.frustumCulled = false;
+                clashAnnotationGroup.add(annotation);
+                updateClashAnnotationCamera();
+            };
+
+            // Giữ nhãn luôn hướng theo camera; khi zoom gần, nhãn và độ lệch khỏi điểm clash tự thu nhỏ.
+            const updateClashAnnotationCamera = () => {
+                if (!camera || !clashAnnotationGroup.visible) return;
+                camera.updateMatrixWorld();
+                const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+                const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+                clashAnnotationGroup.children.forEach(annotation => {
+                    const data = annotation.userData.clashLabel;
+                    if (!data) return;
+                    let zoomScale = 1;
+                    if (isOrthographic.value) {
+                        zoomScale = THREE.MathUtils.clamp(1 / Math.sqrt(Math.max(orthoCamera.zoom, 0.01)), 0.38, 1.35);
+                    } else {
+                        const distance = Math.max(camera.position.distanceTo(data.anchor), 0.001);
+                        const referenceDistance = Math.max(data.radius * 12, 0.25);
+                        zoomScale = THREE.MathUtils.clamp(Math.sqrt(distance / referenceDistance), 0.38, 1.35);
+                    }
+                    const width = data.baseLabelWidth * zoomScale;
+                    data.sprite.scale.set(width, width * 0.25, 1);
+                    const offset = data.baseOffset * zoomScale;
+                    const labelPosition = data.anchor.clone()
+                        .addScaledVector(right, offset)
+                        .addScaledVector(up, offset * 0.72);
+                    data.sprite.position.copy(labelPosition);
+                    data.leader.geometry.setFromPoints([data.anchor, labelPosition]);
+                    data.leader.geometry.computeBoundingSphere();
+                });
+            };
+            const selectClashItem = (item) => {
+                clearClashSelectionVisuals();
+                if (!item?.mesh || !item.mesh.isMesh) return;
+                selectedClashId.value = item.id;
+                selectedClashMesh = item.mesh;
+                selectedClashMesh.material = clashYellowMaterial;
+
+                // Viền nét đứt cùng phong cách viền đối tượng đang được select trong mô hình.
+                selectedClashMesh.updateWorldMatrix(true, false);
+                const outlineGeometry = new THREE.EdgesGeometry(selectedClashMesh.geometry, 15);
+                outlineGeometry.applyMatrix4(selectedClashMesh.matrixWorld);
+                const outline = new THREE.LineSegments(outlineGeometry, selectionOutlineMaterial);
+                outline.computeLineDistances();
+                outline.renderOrder = 2002;
+                outline.frustumCulled = false;
+                clashSelectionGroup.add(outline);
+                addClashLocationLabel(item, Math.max(0, clashItems.value.findIndex(entry => entry.id === item.id)));
+
+                // Nhấp nháy đỏ/vàng trong 0,5 giây, sau đó giữ màu vàng.
+                let showRed = true;
+                selectedClashMesh.material = clashRedMaterial;
+                clashFlashInterval = setInterval(() => {
+                    if (!selectedClashMesh || selectedClashMesh !== item.mesh) return;
+                    showRed = !showRed;
+                    selectedClashMesh.material = showRed ? clashRedMaterial : clashYellowMaterial;
+                    requestRender();
+                }, 65);
+                clashFlashTimeout = setTimeout(() => {
+                    if (clashFlashInterval) clearInterval(clashFlashInterval);
+                    clashFlashInterval = null;
+                    clashFlashTimeout = null;
+                    if (selectedClashMesh === item.mesh) selectedClashMesh.material = clashYellowMaterial;
+                    requestRender();
+                    }, 500);
+                requestRender();
+                refreshClashPairObjects();
+            };
+            const applyClashDisplayMode = () => {
+                const active = clashModeActive.value;
+                if (batchGroup) batchGroup.visible = !active;
+                if (overlayGroup) overlayGroup.visible = !active;
+                if (edgesGroup) edgesGroup.visible = showEdges.value && !active;
+                clashContextGroup.visible = active;
+                clashGroup.visible = active;
+                clashSelectionGroup.visible = active;
+                clashAnnotationGroup.visible = active;
+                requestRender();
+            };
+            const clearClashGeometry = () => {
+                clearClashSelectionVisuals();
+                while (clashGroup.children.length) {
+                    const child = clashGroup.children[0];
+                    child.traverse(node => {
+                        if (node.geometry) node.geometry.dispose();
+                    });
+                    clashGroup.remove(child);
+                }
+                while (clashContextGroup.children.length) {
+                    const child = clashContextGroup.children[0];
+                    child.geometry?.dispose();
+                    clashContextGroup.remove(child);
+                }
+            };
+            const clearClashResults = () => {
+                clearClashGeometry();
+                clashModeActive.value = false;
+                clashCount.value = 0;
+                clashVolume.value = 0;
+                clashItems.value = [];
+                clashError.value = '';
+                refreshBatchMaterials();
+                applyModelOpacityToScene();
+                applyClashDisplayMode();
+                requestRender();
+            };
+            const zoomToClash = (item) => {
+                if (!item?.bounds?.min || !item?.bounds?.max || !camera || !controls || !renderer) return;
+                selectClashItem(item);
+                const box = new THREE.Box3(
+                    new THREE.Vector3(...item.bounds.min),
+                    new THREE.Vector3(...item.bounds.max)
+                );
+                if (box.isEmpty()) return;
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const radius = Math.max(size.length() * 0.5, 0.025);
+                const direction = camera.position.clone().sub(controls.target).normalize();
+                if (direction.lengthSq() < 0.001) direction.set(1, 0.7, 1).normalize();
+                const aspect = Math.max(renderer.domElement.clientWidth / Math.max(renderer.domElement.clientHeight, 1), 0.1);
+                if (isOrthographic.value) {
+                    const halfHeight = Math.max(size.y, size.x / aspect, size.z, 0.05) * 0.75;
+                    orthoCamera.left = -halfHeight * aspect;
+                    orthoCamera.right = halfHeight * aspect;
+                    orthoCamera.top = halfHeight;
+                    orthoCamera.bottom = -halfHeight;
+                    orthoCamera.near = 0.001;
+                    orthoCamera.far = Math.max(radius * 30, 100);
+                    orthoCamera.zoom = 1;
+                    orthoCamera.updateProjectionMatrix();
+                    camera.position.copy(center).addScaledVector(direction, Math.max(radius * 3, 1));
+                } else {
+                    const fov = THREE.MathUtils.degToRad(camera.fov);
+                    const distance = Math.max(radius / Math.sin(fov / 2) * 1.35, 0.75);
+                    camera.position.copy(center).addScaledVector(direction, distance);
+                    camera.near = Math.max(radius / 1000, 0.001);
+                    camera.far = Math.max(distance + radius * 20, 100);
+                    camera.updateProjectionMatrix();
+                }
+                controls.target.copy(center);
+                controls.update();
+                requestRender();
+            };
+            const runClashCheck = async () => {
+                if (clashBusy.value) return;
+                const candidates = modelGroup.children.filter(mesh =>
+                    mesh.isMesh && mesh.visible && mesh.geometry?.attributes?.position &&
+                    !pendingDeletedExpressIDs.has(getMeshKey(mesh))
+                );
+                if (candidates.length < 2) {
+                    showToast('Chưa đủ cấu kiện', 'Cần ít nhất hai cấu kiện đang hiển thị để kiểm tra clash.');
+                    return;
+                }
+                const toleranceMm = Number(clashToleranceMm.value);
+                if (!Number.isFinite(toleranceMm) || toleranceMm < 0 || toleranceMm > 1000) {
+                    clashError.value = 'Dung sai phải nằm trong khoảng từ 0 đến 1000 mm.';
+                    return;
+                }
+                const toleranceMeters = toleranceMm / 1000;
+                const halfTolerance = toleranceMeters / 2;
+                clashBusy.value = true;
+                clashError.value = '';
+                try {
+                    clearClashGeometry();
+                    clashItems.value = [];
+                    clashCount.value = 0;
+                    clashVolume.value = 0;
+                    clashModeActive.value = false;
+                    applyClashDisplayMode();
+                    modelGroup.updateWorldMatrix(true, true);
+                    const typeA = clashTypeA.value;
+                    const typeB = clashTypeB.value;
+                    const pairMatchesTypes = (meshA, meshB) => {
+                        const aType = meshA.userData.type || 'IFCELEMENT';
+                        const bType = meshB.userData.type || 'IFCELEMENT';
+                        if (typeA === '*' && typeB === '*') return true;
+                        if (typeA === '*') return aType === typeB || bType === typeB;
+                        if (typeB === '*') return aType === typeA || bType === typeA;
+                        return (aType === typeA && bType === typeB) || (aType === typeB && bType === typeA);
+                    };
+                    const entries = candidates.map(mesh => {
+                        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+                        const box = mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld);
+                        if (halfTolerance > 0) box.expandByScalar(halfTolerance);
+                        return { mesh, box };
+                    });
+                    const evaluator = new Evaluator();
+                    evaluator.useGroups = false;
+                    evaluator.attributes = ['position', 'normal'];
+                    const brushCache = new Map();
+                    const makeBrush = (mesh) => {
+                        let brush = brushCache.get(mesh);
+                        if (brush) return brush;
+                        const geometry = mesh.geometry.clone();
+                        if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
+                        if (halfTolerance > 0) {
+                            // Nới từng bề mặt ra 1/2 dung sai để bắt cả khe hở nhỏ trong giới hạn cho phép.
+                            const positions = geometry.getAttribute('position');
+                            const normals = geometry.getAttribute('normal');
+                            const normal = new THREE.Vector3();
+                            for (let vertex = 0; vertex < positions.count; vertex++) {
+                                normal.fromBufferAttribute(normals, vertex);
+                                if (normal.lengthSq() > 1e-12) normal.normalize();
+                                positions.setXYZ(
+                                    vertex,
+                                    positions.getX(vertex) + normal.x * halfTolerance,
+                                    positions.getY(vertex) + normal.y * halfTolerance,
+                                    positions.getZ(vertex) + normal.z * halfTolerance
+                                );
+                            }
+                            positions.needsUpdate = true;
+                            geometry.computeVertexNormals();
+                            geometry.computeBoundingBox();
+                        }
+                        if (!geometry.boundsTree && geometry.computeBoundsTree) geometry.computeBoundsTree();
+                        brush = new Brush(geometry, clashBlueMaterial);
+                        brush.matrixAutoUpdate = false;
+                        brush.matrix.copy(mesh.matrixWorld);
+                        brush.updateMatrixWorld(true);
+                        brushCache.set(mesh, brush);
+                        return brush;
+                    };
+                    const found = [];
+                    let checked = 0;
+                    let totalPairs = 0;
+                    for (let i = 0; i < entries.length; i++) {
+                        for (let j = i + 1; j < entries.length; j++) {
+                            const a = entries[i], b = entries[j];
+                            if (getMeshKey(a.mesh) !== getMeshKey(b.mesh) && pairMatchesTypes(a.mesh, b.mesh) && a.box.intersectsBox(b.box)) totalPairs++;
+                        }
+                    }
+                    for (let i = 0; i < entries.length; i++) {
+                        if (clashCancelRequested) break;
+                        const a = entries[i];
+                        for (let j = i + 1; j < entries.length; j++) {
+                            const b = entries[j];
+                            if (clashCancelRequested) break;
+                            if (getMeshKey(a.mesh) === getMeshKey(b.mesh) || !pairMatchesTypes(a.mesh, b.mesh) || !a.box.intersectsBox(b.box)) continue;
+                            checked++;
+                            clashProgress.value = checked / Math.max(totalPairs, 1);
+                            if (checked % 20 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+
+                            try {
+                                const result = evaluator.evaluate(makeBrush(a.mesh), makeBrush(b.mesh), INTERSECTION);
+                                const geometry = result.geometry;
+                                if (!geometry?.attributes?.position || geometry.attributes.position.count < 4) {
+                                    geometry?.dispose();
+                                    continue;
+                                }
+                                result.updateMatrixWorld(true);
+                                const position = geometry.attributes.position;
+                                const index = geometry.index;
+                                let signedVolume = 0;
+                                const triangleCount = index ? index.count / 3 : position.count / 3;
+                                const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
+                                for (let triangle = 0; triangle < triangleCount; triangle++) {
+                                    const ia = index ? index.getX(triangle * 3) : triangle * 3;
+                                    const ib = index ? index.getX(triangle * 3 + 1) : triangle * 3 + 1;
+                                    const ic = index ? index.getX(triangle * 3 + 2) : triangle * 3 + 2;
+                                    va.fromBufferAttribute(position, ia);
+                                    vb.fromBufferAttribute(position, ib);
+                                    vc.fromBufferAttribute(position, ic);
+                                    signedVolume += va.dot(vb.clone().cross(vc)) / 6;
+                                }
+                                const transformScale = Math.abs(result.matrixWorld.determinant());
+                                const intersectionVolume = Math.abs(signedVolume) * transformScale;
+                                if (!Number.isFinite(intersectionVolume) || intersectionVolume < 1e-10) {
+                                    geometry.dispose();
+                                    continue;
+                                }
+                                const clashMesh = new THREE.Mesh(geometry, clashBlueMaterial);
+                                clashMesh.matrixAutoUpdate = false;
+                                clashMesh.matrix.copy(result.matrixWorld);
+                                clashMesh.matrixWorld.copy(result.matrixWorld);
+                                clashMesh.frustumCulled = false;
+                                clashMesh.renderOrder = 100;
+                                const outlineGeometry = new THREE.EdgesGeometry(geometry, 18);
+                                const outline = new THREE.LineSegments(outlineGeometry, clashOutlineMaterial);
+                                outline.renderOrder = 101;
+                                outline.frustumCulled = false;
+                                clashMesh.add(outline);
+                                clashGroup.add(clashMesh);
+                                clashMesh.updateMatrixWorld(true);
+                                const intersectionBounds = new THREE.Box3().setFromObject(clashMesh);
+                                found.push({
+                                    id: `${getMeshKey(a.mesh)}|${getMeshKey(b.mesh)}|${i}|${j}`,
+                                    nameA: a.mesh.userData.name || `#${a.mesh.userData.expressID}`,
+                                    nameB: b.mesh.userData.name || `#${b.mesh.userData.expressID}`,
+                                    typeA: a.mesh.userData.type || 'IFCELEMENT',
+                                    typeB: b.mesh.userData.type || 'IFCELEMENT',
+                                    volume: intersectionVolume,
+                                    mesh: markRaw(clashMesh),
+                                    sourceA: markRaw(a.mesh),
+                                    sourceB: markRaw(b.mesh),
+                                    bounds: {
+                                        min: intersectionBounds.min.toArray(),
+                                        max: intersectionBounds.max.toArray()
+                                    }
+                                });
+                            } catch (pairError) {
+                                console.warn('Không thể tính giao thể tích cho một cặp cấu kiện:', pairError);
+                            }
+                        }
+                    }
+                    brushCache.forEach(brush => brush.geometry.dispose());
+                    if (clashCancelRequested) {
+                        clearClashGeometry();
+                        clashModeActive.value = false;
+                        refreshBatchMaterials();
+                        applyModelOpacityToScene();
+                        applyClashDisplayMode();
+                        requestRender();
+                        showToast('Đã hủy kiểm tra', 'Tiến trình kiểm tra clash đã được hủy.');
+                        return;
+                    }
+
+                    // Chỉ hiện đường bao xám ngoài bề mặt; không vẽ mesh đặc của mô hình nền.
+                    candidates.forEach(mesh => {
+                        try {
+                            const outlineGeometry = new THREE.EdgesGeometry(mesh.geometry, 18);
+                            outlineGeometry.applyMatrix4(mesh.matrixWorld);
+                            const outline = new THREE.LineSegments(outlineGeometry, clashContextMaterial);
+                            outline.frustumCulled = false;
+                            outline.renderOrder = 1;
+                            clashContextGroup.add(outline);
+                        } catch (edgeError) {
+                            console.warn('Không tạo được đường bao cấu kiện:', edgeError);
+                        }
+                    });
+
+                    // Xếp cặp có thể tích giao lớn nhất lên đầu danh sách.
+                    found.sort((a, b) => b.volume - a.volume);
+                    clashItems.value = found;
+                    clashCount.value = found.length;
+                    // Tổng thể tích giao theo từng cặp cấu kiện (có thể đếm trùng nếu nhiều cấu kiện cùng giao một vùng).
+                    clashVolume.value = found.reduce((sum, item) => sum + item.volume, 0);
+                    clashModeActive.value = true;
+                    refreshBatchMaterials();
+                    applyModelOpacityToScene();
+                    applyClashDisplayMode();
+                    requestRender();
+                    showToast('Hoàn tất kiểm tra Clash', `Phát hiện ${found.length} cặp có vùng giao nhau.`, 'success');
+                } catch (error) {
+                    console.error('Clash check failed:', error);
+                    clashError.value = error?.message || 'Không thể hoàn tất kiểm tra clash.';
+                    clearClashGeometry();
+                    clashModeActive.value = false;
+                    refreshBatchMaterials();
+                    applyModelOpacityToScene();
+                    applyClashDisplayMode();
+                    showToast('Lỗi kiểm tra Clash', clashError.value);
+                } finally {
+                    clashBusy.value = false;
+                    clashProgress.value = 0;
+                    clashCancelRequested = false;
+                }
+            };
+            const onClashButtonClick = () => {
+                if (clashBusy.value) {
+                    clashCancelRequested = true;
+                    return;
+                }
+                runClashCheck();
             };
 
             // --- 6. CÁC TÙY CHỌN HIỂN THỊ ---
@@ -4063,6 +4714,7 @@
             // Chuyển hit của raycast batch/overlay về đúng cấu kiện
             const resolveHitElement = (intersect) => {
                 if (intersect.object.userData.element) return intersect.object.userData.element;
+                if (intersect.object.isMesh && !intersect.object.userData.record) return intersect.object;
                 return intersect.object.userData.record?.elements[intersect.batchId] ?? null;
             };
 
@@ -4323,6 +4975,17 @@
             };
 
             const getVisibleModelIntersections = () => {
+                if (clashModeActive.value) {
+                    // Khi đang xem kết quả clash, batch/overlay đang ẩn: pick trực tiếp vào các cấu kiện thật (layer 1).
+                    const candidates = modelGroup.children.filter(mesh =>
+                        mesh.isMesh && mesh.visible && !pendingDeletedExpressIDs.has(getMeshKey(mesh))
+                    );
+                    const previousLayers = raycaster.layers.mask;
+                    raycaster.layers.set(1);
+                    const clashHits = raycaster.intersectObjects(candidates, false);
+                    raycaster.layers.mask = previousLayers;
+                    return clashHits.filter(hit => isPointInsideCropBounds(hit.point));
+                }
                 syncBatchVisibility();
                 const pickables = batchRecords.map(record => record.batch);
                 overlayByElement.forEach(overlay => { if (overlay.visible) pickables.push(overlay); });
@@ -4960,6 +5623,7 @@
             };
 
             const clearCurrentModel = () => {
+                clearClashResults();
                 clearSelection();
                 resetTransportState();
                 hoveredMesh = null;
@@ -4991,6 +5655,7 @@
 
                 modelGroup.position.set(0, 0, 0);
                 modelOffset.set(0, 0, 0);
+                modelRebaseOrigin = null;
                 stats.meshes = 0;
                 stats.rebarCount = 0;
                 faultyCount.value = 0;
@@ -5136,6 +5801,9 @@
                 endPanelResize,
                 adjustPanelWidth,
                 leftActiveTab,
+                clashModeActive, clashBusy, clashCount, clashVolume, clashError, clashItems,
+                clashTypeA, clashTypeB, clashToleranceMm, clashTypeOptions, selectedClashId,
+                runClashCheck, onClashButtonClick, clashProgress, clearClashResults, zoomToClash, showClashPairObjects, toggleClashPairObjects,
                 groupCriterion,
                 groupSearchQuery,
                 isRebarOnly,
