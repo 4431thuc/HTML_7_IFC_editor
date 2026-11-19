@@ -63,6 +63,8 @@ export const transportInnerTab = ref('profiles');
 export const transportProfiles = ref([]);
 export const transportHistory = ref([]);
 export const showTransportProfileModal = ref(false);
+// Hộp thoại hỏi khi thêm file IFC trùng tên file đang có: { name, resolve } hoặc null
+export const duplicateFilePrompt = ref(null);
 export const transportProfileName = ref('');
 export const transportProfileNameInput = ref(null);
 

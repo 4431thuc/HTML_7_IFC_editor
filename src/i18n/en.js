@@ -183,6 +183,10 @@ export const EN = {
 
     // --- Thông tin dự án (panel phải) ---
     'Thông tin dự án': 'Project information',
+    'File IFC trùng tên': 'Duplicate IFC file name',
+    'File "{0}" đã có trong danh sách gộp (đang mở). Vẫn mở thêm một bản nữa?': 'File "{0}" is already in the combine list (currently open). Open another copy anyway?',
+    'Không mở': 'Do not open',
+    'Vẫn mở tiếp': 'Open anyway',
     'Mở file IFC là panel phải hiện ngay thông tin dự án: header file, dự án, khu đất, tòa nhà, tầng, người và ứng dụng xuất IFC. Sửa trực tiếp rồi lưu thành file IFC mới.': 'Opening an IFC file shows its project information in the right panel: file header, project, site, building, storeys, exporting person and application. Edit it in place and save a new IFC file.',
     'File IFC': 'IFC file',
     'Sửa các thông tin của dự án rồi bấm "Áp dụng vào IFC"; sau đó bấm "Lưu file IFC" để tạo file IFC mới. Ô đã sửa có viền vàng.': 'Edit the project information, click "Apply to IFC", then click "Save IFC file" to create a new IFC file. Edited fields have a yellow border.',

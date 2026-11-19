@@ -9,7 +9,7 @@ import { getRebarColorByDiameter } from '../scene/sample-model.js';
 import { fitCameraToModel } from '../scene/scene.js';
 import { clearSelection, updateSelectionDimmingEffect } from '../selection/selection.js';
 import { ENTITY_DEFAULT_COLORS, REBAR_ENTITY_TYPES, parseDiameterMm } from '../state/constants.js';
-import { allGroups, batchGroup, clippingPlanes, deletedItems, edgesGroup, editHistoryCount, exportListVersion, faultyCount, fileName, hasLoadedIfc, hasUnsavedChanges, hoveredType, isCropBoxActive, isEditingAttributes, isIfcDragOver, isLoading, isSampleModel, isWireframe, loadingText, manuallyHiddenExpressIDs, materialCache, overlayGroup, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes, selectedObject, showEdges, sourceFiles, stats, toastMessage } from '../state/state.js';
+import { duplicateFilePrompt, allGroups, batchGroup, clippingPlanes, deletedItems, edgesGroup, editHistoryCount, exportListVersion, faultyCount, fileName, hasLoadedIfc, hasUnsavedChanges, hoveredType, isCropBoxActive, isEditingAttributes, isIfcDragOver, isLoading, isSampleModel, isWireframe, loadingText, manuallyHiddenExpressIDs, materialCache, overlayGroup, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes, selectedObject, showEdges, sourceFiles, stats, toastMessage } from '../state/state.js';
 import { applyModelOpacityToMaterial, showToast } from '../ui/panels.js';
 import { showPropertiesForMesh } from '../ui/properties.js';
 import { removeProjectInfo, showProjectInfoForSource } from './project-info.js';
@@ -52,10 +52,26 @@ export const handleIfcDrop = async (event) => {
     }
 };
 
+// Hỏi người dùng có mở tiếp không khi file thêm vào trùng tên với file đang mở / đang trong danh sách gộp
+const confirmDuplicateFile = (name) => new Promise(resolve => {
+    duplicateFilePrompt.value = { name, resolve };
+});
+export const answerDuplicateFilePrompt = (openAnyway) => {
+    const prompt = duplicateFilePrompt.value;
+    duplicateFilePrompt.value = null;
+    prompt?.resolve(openAnyway);
+};
+
 export const loadIfcFile = async (file, replaceCurrent) => {
     if (!file.name.toLowerCase().endsWith('.ifc')) {
         showToast(t('Định dạng sai'), t('Vui lòng chọn tệp .ifc chuẩn: {0}', [file.name]));
         return false;
+    }
+    if (!replaceCurrent) {
+        const lowerName = file.name.toLowerCase();
+        if (sourceFiles.value.some(source => source.name.toLowerCase() === lowerName)) {
+            if (!await confirmDuplicateFile(file.name)) return false;
+        }
     }
 
     toastMessage.value = '';

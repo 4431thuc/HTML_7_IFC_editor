@@ -1,4 +1,5 @@
 ## 19.11.2026
+- thêm file IFC (tab Gộp, kéo thả) trùng tên file đang mở: hiện hộp thoại hỏi có mở tiếp không
 - panel phải hiển thị và sửa thông tin cấp dự án của file IFC vừa mở (header, project, site, building, storey, người/ứng dụng xuất IFC, địa chỉ), lưu vào IFC mới; code ở src/ifc/project-info.js (header ghi bằng hậu xử lý text khi xuất)
 - đổi tên tab "Xuất" thành "Chia tách" (EN: Split) vì chức năng là xuất riêng phần đang hiển thị; mã tab vẫn là `export`
 - tab Đo đạc (Dimension): phím D bật/tắt chế độ đo, click 2 điểm tạo đường đo + nhãn cm/m, quả cầu tự co theo zoom, hover hiện điểm pick, danh sách có nút xóa và zoom tới khoảng đo; code ở src/dimension/dimension.js (hàm pickDimensionPoint là chỗ cắm bắt điểm/line/bề mặt)
