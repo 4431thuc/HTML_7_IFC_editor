@@ -879,12 +879,6 @@
                         aria-label="Độ mờ toàn bộ mô hình">
                     <span class="w-8 text-right font-mono">{{ modelOpacityPercent }}%</span>
                 </label>
-                <!-- Nút chuyển nền sáng / tối (đồng bộ với Cài đặt > Nền view) -->
-                <button type="button" @click="setBackgroundTheme(!isLightBackground)"
-                    class="pointer-events-auto w-7 h-6 flex items-center justify-center rounded-md border text-sm leading-none cursor-pointer transition active:scale-95"
-                    :class="isLightBackground ? 'bg-amber-50 border-amber-300 hover:bg-amber-100' : 'bg-slate-800 border-slate-600 hover:bg-slate-700'"
-                    :title="isLightBackground ? 'Đang nền sáng - bấm để chuyển nền tối' : 'Đang nền tối - bấm để chuyển nền sáng'"
-                    :aria-label="isLightBackground ? 'Chuyển sang nền tối' : 'Chuyển sang nền sáng'">{{ isLightBackground ? '☀️' : '🌚' }}</button>
                 <!-- Nút chuyển Perspective / Orthographic -->
                 <button type="button" @click="toggleCameraProjection"
                     class="pointer-events-auto px-2.5 py-0.5 rounded-md border text-[11px] font-semibold cursor-pointer transition active:scale-95"
