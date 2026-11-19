@@ -68,6 +68,70 @@
             pointer-events: none;
             z-index: 50;
         }
+        /* VIEW CUBE: khối cubic CSS 3D (cạnh 52px) + SVG trục tọa độ phủ lên trên */
+        .vc-wrap {
+            width: 120px;
+            height: 120px;
+            pointer-events: none;
+            --vc-face: #f1f5f9; --vc-edge: #e2e8f0; --vc-corner: #cbd5e1;
+            --vc-text: #334155; --vc-line: #94a3b8; --vc-hot: #fb923c;
+        }
+        .vc-wrap.vc-dark {
+            --vc-face: #1e293b; --vc-edge: #283548; --vc-corner: #334155;
+            --vc-text: #e2e8f0; --vc-line: #475569; --vc-hot: #f59e0b;
+        }
+        .vc-scene {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+        .vc-cube {
+            position: relative;
+            width: 52px;
+            height: 52px;
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+        .vc-face {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            grid-template-columns: 10px 32px 10px;
+            grid-template-rows: 10px 32px 10px;
+            background: var(--vc-face);
+            backface-visibility: hidden;
+        }
+        .vc-cell {
+            appearance: none;
+            border: 0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: var(--vc-text);
+            font: 700 8px/1 'Inter', sans-serif;
+            cursor: pointer;
+            pointer-events: auto;
+            box-shadow: inset 0 0 0 0.5px var(--vc-line);
+            transition: background-color 0.12s;
+        }
+        .vc-cell.vc-edge { background: var(--vc-edge); }
+        .vc-cell.vc-corner { background: var(--vc-corner); }
+        .vc-cell:hover, .vc-cell.vc-hot { background: var(--vc-hot); color: #1e293b; }
+        .vc-axes {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            z-index: 2;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 h-screen w-screen flex flex-col" @click="closeContextMenu">
@@ -102,7 +166,7 @@
 
             <!-- Nút Lưu / Xuất IFC mới -->
             <button @click="exportModifiedIFC" :disabled="isLoading || !wasmReady || !hasUnsavedChanges"
-                class="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition shadow-sm"
+                class="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition shadow-sm"
                 title="Lưu lại toàn bộ thuộc tính đã chỉnh sửa thành file IFC mới">
                 <i class="ph-bold ph-floppy-disk text-base"></i>
                 <span class="hidden md:inline">Lưu file IFC</span>
@@ -155,9 +219,9 @@
         
         <!-- PANEL BÊN TRÁI: QUẢN LÝ HIỂN THỊ (DISPLAY) & PHÂN NHÓM (GROUPS) -->
         <aside v-show="showLeftPanel" :style="{ width: `${leftPanelWidth}px` }"
-            class="min-w-[240px] max-w-[640px] bg-slate-900 border-r border-slate-800 flex flex-col z-20 shrink-0 shadow-2xl select-none">
+            class="min-w-[240px] max-w-[640px] bg-slate-900/80 border-r border-slate-800 flex flex-col z-20 absolute left-0 top-0 bottom-0 shadow-2xl select-none">
             
-            <div class="px-1 py-1 border-b border-slate-800 left-tabs flex flex-wrap items-stretch bg-slate-900/90 gap-0.5">
+            <div class="px-1 py-1 border-b border-slate-800 left-tabs flex flex-wrap items-stretch bg-slate-900/80 gap-0.5">
                 <button @click="leftActiveTab = 'display'" 
                     :class="leftActiveTab === 'display' ? 'bg-slate-800 text-blue-400 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[10px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
@@ -526,7 +590,7 @@
                                 @mouseenter="onItemMouseEnter(mesh)"
                                 @mouseleave="onItemMouseLeave(mesh)"
                                 :class="[
-                                    isMeshSelected(mesh) ? 'bg-amber-500/20 text-amber-200 border-l-2 border-l-amber-400' : 'hover:bg-slate-800/40 text-slate-300',
+                                    isMeshPendingRemoval(mesh) ? 'opacity-40 pointer-events-none text-slate-500' : (isMeshSelected(mesh) ? 'bg-amber-500/20 text-amber-200 border-l-2 border-l-amber-400' : 'hover:bg-slate-800/40 text-slate-300'),
                                     isMeshManuallyHidden(mesh) ? 'opacity-40' : ''
                                 ]"
                                 class="pl-8 pr-3 py-1.5 flex items-center justify-between text-[11px] cursor-pointer transition select-none">
@@ -534,6 +598,7 @@
                                     <span class="font-mono text-[10px] text-slate-500">#{{ mesh.userData.expressID }}</span>
                                     <span class="truncate">{{ mesh.userData.name || 'Unnamed' }}</span>
                                     <span v-if="isMeshManuallyHidden(mesh)" class="shrink-0 rounded bg-slate-700 px-1 text-[9px] text-slate-400">Ẩn</span>
+                                    <span v-if="isMeshPendingRemoval(mesh)" class="shrink-0 rounded bg-rose-900/60 px-1 text-[9px] text-rose-300">Đã xóa</span>
                                 </div>
                                 <span v-if="mesh.userData.sourceFileName" class="max-w-20 truncate text-[9px] text-slate-500" :title="mesh.userData.sourceFileName">{{ mesh.userData.sourceFileName }}</span>
                                 <span v-if="mesh.userData.tag" class="text-[10px] font-mono text-amber-400/80 shrink-0 ml-1">
@@ -807,82 +872,15 @@
                 </div>
             </div>
 
-            <div v-if="showIntroPanel" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
-                style="z-index: 10000" @click.self="closeIntroPanel">
-                <section class="w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-700/80 bg-slate-900 shadow-2xl">
-                    <div class="relative overflow-hidden border-b border-slate-800 px-6 py-5 sm:px-8">
-                        <div class="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-blue-500/10 blur-2xl"></div>
-                        <div class="absolute -left-12 bottom-[-5rem] h-40 w-40 rounded-full bg-emerald-500/10 blur-2xl"></div>
-                        <div class="relative flex items-start gap-4">
-                            <div class="shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center shadow-lg">
-                                <i class="ph-bold ph-cube text-2xl text-white"></i>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-400">{{ introPanelContent.badge }}</div>
-                                <h2 class="text-xl sm:text-2xl font-bold text-white">{{ introPanelContent.title }}</h2>
-                                <p class="mt-2 max-w-2xl text-xs sm:text-sm leading-relaxed text-slate-300">{{ introPanelContent.subtitle }}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid gap-3 p-4 sm:grid-cols-2 sm:p-6">
-                        <article v-for="feature in introPanelContent.features" :key="feature.title"
-                            class="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-                            <div class="flex items-center gap-2 text-emerald-400">
-                                <i :class="`ph-bold ${feature.icon}`" class="text-lg"></i>
-                                <h3 class="text-sm font-bold text-slate-100">{{ feature.title }}</h3>
-                            </div>
-                            <p class="mt-2 text-xs leading-relaxed text-slate-400">{{ feature.text }}</p>
-                        </article>
-                    </div>
-
-                    <div class="grid gap-3 px-4 pb-4 sm:grid-cols-2 sm:px-6">
-                        <article class="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-blue-300">{{ introPanelContent.advantageTitle }}</h3>
-                            <p class="mt-2 text-xs leading-relaxed text-slate-300">{{ introPanelContent.advantageText }}</p>
-                        </article>
-                        <article class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-amber-300">{{ introPanelContent.roadmapTitle }}</h3>
-                            <p class="mt-2 text-xs leading-relaxed text-slate-300">{{ introPanelContent.roadmapText }}</p>
-                        </article>
-                    </div>
-
-                    <div class="sticky bottom-0 flex items-center justify-between border-t border-slate-800 bg-slate-900 px-4 py-3 sm:px-6">
-                        <label class="flex items-center gap-2 text-[11px] text-slate-400">
-                            <input type="checkbox" v-model="dontShowIntroAgain" class="rounded border-slate-600 bg-slate-950 text-emerald-500">
-                            Không hiển thị lại
-                        </label>
-                        <button type="button" @click="closeIntroPanel"
-                            class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-lg hover:bg-emerald-500">
-                            Bắt đầu sử dụng
-                        </button>
-                    </div>
-                </section>
-            </div>
-
-            <div v-if="showTransportProfileModal" class="fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4">
-                <form @submit.prevent="saveTransportProfile" class="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-4 shadow-2xl space-y-3">
-                    <h3 class="text-sm font-bold text-slate-100">Lưu bộ tọa độ</h3>
-                    <label class="block text-[11px] text-slate-400">
-                        Tên profile
-                        <input ref="transportProfileNameInput" v-model="transportProfileName" type="text" maxlength="80" required
-                            class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
-                    </label>
-                    <div class="flex justify-end gap-2">
-                        <button type="button" @click="showTransportProfileModal = false" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs">Hủy</button>
-                        <button type="submit" class="px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold">Lưu profile</button>
-                    </div>
-                </form>
-            </div>
 
         </aside>
 
         <div v-show="showLeftPanel" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng panel trái"
-            title="Kéo để thay đổi độ rộng panel trái" tabindex="0"
+            title="Kéo để thay đổi độ rộng panel trái" tabindex="0" :style="{ left: `${leftPanelWidth}px` }"
             @pointerdown="startPanelResize('left', $event)" @pointermove="updatePanelResize"
             @pointerup="endPanelResize" @pointercancel="endPanelResize" @lostpointercapture="endPanelResize"
             @keydown.right.prevent="adjustPanelWidth('left', 16)" @keydown.left.prevent="adjustPanelWidth('left', -16)"
-            class="group relative z-30 hidden sm:flex w-1.5 shrink-0 cursor-col-resize touch-none items-center justify-center bg-slate-800/80 hover:bg-sky-500/60 active:bg-sky-500 transition-colors">
+            class="group absolute top-0 bottom-0 z-30 hidden sm:flex w-1.5 cursor-col-resize touch-none items-center justify-center bg-slate-800/80 hover:bg-sky-500/60 active:bg-sky-500 transition-colors">
             <span class="h-10 w-0.5 rounded bg-slate-500 group-hover:bg-white"></span>
         </div>
 
@@ -892,9 +890,24 @@
             @dragleave.prevent="handleIfcDragLeave" @drop.prevent="handleIfcDrop">
             
             <div v-show="isBoxSelecting" class="selectBoxOverlay" :style="boxSelectionStyle"></div>
-            <div class="absolute top-3 right-3 z-20 w-24 h-24 rounded-xl border shadow-lg backdrop-blur-md pointer-events-none"
-                :class="isLightBackground ? 'bg-white/85 border-slate-300/80' : 'bg-slate-900/85 border-slate-700/70'">
-                <svg viewBox="0 0 100 100" class="w-full h-full" aria-label="Hướng các trục tọa độ, quy ước xây dựng đổi vị trí Y và Z">
+            <!-- VIEW CUBE: khối cubic đồng bộ với camera, bấm mặt/cạnh/góc để đổi hướng nhìn -->
+            <div :style="{ right: `${(showRightPanel ? rightPanelWidth : 0) + 12}px` }"
+                class="vc-wrap absolute top-3 z-20 select-none"
+                :class="isLightBackground ? 'vc-light' : 'vc-dark'">
+                <div class="vc-scene">
+                    <div ref="viewCubeEl" class="vc-cube">
+                        <div v-for="face in viewCubeFaces" :key="face.id" class="vc-face" :style="{ transform: face.transform }">
+                            <button v-for="cell in face.cells" :key="cell.id" type="button"
+                                class="vc-cell" :class="[cell.kind, hoverViewDir === cell.key ? 'vc-hot' : '']"
+                                :title="cell.title"
+                                @click="setViewDirection(cell.dir)"
+                                @mouseenter="hoverViewDir = cell.key" @mouseleave="hoverViewDir = ''">
+                                <span v-if="cell.kind === 'vc-face-cell'">{{ face.label }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <svg viewBox="0 0 100 100" class="vc-axes" aria-label="Hướng các trục tọa độ, quy ước xây dựng đổi vị trí Y và Z">
                     <defs>
                         <marker id="axisGizmoArrowX" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
                             <path d="M0,0 L7,3.5 L0,7 Z" fill="#ef4444"></path>
@@ -906,16 +919,15 @@
                             <path d="M0,0 L7,3.5 L0,7 Z" fill="#3b82f6"></path>
                         </marker>
                     </defs>
-                    <line ref="axisGizmoXLine" x1="50" y1="50" x2="78" y2="50" stroke="#ef4444" stroke-width="4" stroke-linecap="round" marker-end="url(#axisGizmoArrowX)"></line>
-                    <line ref="axisGizmoYLine" x1="50" y1="50" x2="50" y2="22" stroke="#22c55e" stroke-width="4" stroke-linecap="round" marker-end="url(#axisGizmoArrowY)"></line>
-                    <line ref="axisGizmoZLine" x1="50" y1="50" x2="50" y2="22" stroke="#3b82f6" stroke-width="4" stroke-linecap="round" marker-end="url(#axisGizmoArrowZ)"></line>
-                    <circle ref="axisGizmoXPoint" cx="50" cy="50" r="4" fill="#ef4444" visibility="hidden"></circle>
-                    <circle ref="axisGizmoYPoint" cx="50" cy="50" r="4" fill="#22c55e" visibility="hidden"></circle>
-                    <circle ref="axisGizmoZPoint" cx="50" cy="50" r="4" fill="#3b82f6" visibility="hidden"></circle>
-                    <text ref="axisGizmoXLabel" x="85" y="50" fill="#ef4444" font-size="12" font-weight="700" text-anchor="middle" dominant-baseline="middle">X</text>
-                    <text ref="axisGizmoYLabel" x="50" y="15" fill="#22c55e" font-size="12" font-weight="700" text-anchor="middle" dominant-baseline="middle">Y</text>
-                    <text ref="axisGizmoZLabel" x="50" y="15" fill="#3b82f6" font-size="12" font-weight="700" text-anchor="middle" dominant-baseline="middle">Z</text>
-                    <circle cx="50" cy="50" r="2.5" fill="#64748b"></circle>
+                    <line ref="axisGizmoXLine" x1="50" y1="50" x2="78" y2="50" stroke="#ef4444" stroke-width="3" stroke-linecap="round" marker-end="url(#axisGizmoArrowX)"></line>
+                    <line ref="axisGizmoYLine" x1="50" y1="50" x2="50" y2="22" stroke="#22c55e" stroke-width="3" stroke-linecap="round" marker-end="url(#axisGizmoArrowY)"></line>
+                    <line ref="axisGizmoZLine" x1="50" y1="50" x2="50" y2="22" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" marker-end="url(#axisGizmoArrowZ)"></line>
+                    <circle ref="axisGizmoXPoint" cx="50" cy="50" r="3.5" fill="#ef4444" visibility="hidden"></circle>
+                    <circle ref="axisGizmoYPoint" cx="50" cy="50" r="3.5" fill="#22c55e" visibility="hidden"></circle>
+                    <circle ref="axisGizmoZPoint" cx="50" cy="50" r="3.5" fill="#3b82f6" visibility="hidden"></circle>
+                    <text ref="axisGizmoXLabel" x="85" y="50" fill="#ef4444" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="middle">X</text>
+                    <text ref="axisGizmoYLabel" x="50" y="15" fill="#22c55e" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="middle">Y</text>
+                    <text ref="axisGizmoZLabel" x="50" y="15" fill="#3b82f6" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="middle">Z</text>
                 </svg>
             </div>
             <div v-if="isIfcDragOver" class="absolute inset-3 z-30 rounded-2xl border-2 border-dashed border-cyan-400 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
@@ -925,68 +937,9 @@
                 </div>
             </div>
 
-            <!-- THANH 6 NÚT CHUYỂN HƯỚNG NHÌN (VIEW CUBE NAV BAR) -->
-            <div class="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-2 py-1.5 rounded-xl shadow-lg backdrop-blur-md border pointer-events-auto select-none"
-                :class="isLightBackground ? 'bg-white/85 border-slate-300/80 text-slate-700' : 'bg-slate-900/85 border-slate-700/70 text-slate-200'">
-                <button @click="setViewDirection('top')" title="Nhìn từ Trên (Top)" 
-                    class="w-8 h-8 flex flex-col items-center justify-center rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition text-[9px] font-bold gap-0.5 group"
-                    :class="isLightBackground ? 'hover:bg-slate-200/70 text-slate-600' : 'hover:bg-slate-700/70 text-slate-300'">
-                    <svg viewBox="0 0 20 20" class="w-5 h-5" fill="currentColor"><path d="M10 2 L18 8 L10 14 L2 8 Z"/></svg>
-                    <span class="text-[8px] leading-none">TOP</span>
-                </button>
-                <button @click="setViewDirection('bottom')" title="Nhìn từ Dưới (Bottom)"
-                    class="w-8 h-8 flex flex-col items-center justify-center rounded-lg transition text-[9px] font-bold gap-0.5"
-                    :class="isLightBackground ? 'hover:bg-slate-200/70 text-slate-600' : 'hover:bg-slate-700/70 text-slate-300'">
-                    <svg viewBox="0 0 20 20" class="w-5 h-5" fill="currentColor"><path d="M10 18 L18 12 L10 6 L2 12 Z"/></svg>
-                    <span class="text-[8px] leading-none">BOT</span>
-                </button>
-                <div class="w-px h-6 mx-0.5" :class="isLightBackground ? 'bg-slate-300' : 'bg-slate-700'"></div>
-                <button @click="setViewDirection('front')" title="Nhìn từ Trước (Front)"
-                    class="w-8 h-8 flex flex-col items-center justify-center rounded-lg transition text-[9px] font-bold gap-0.5"
-                    :class="isLightBackground ? 'hover:bg-slate-200/70 text-slate-600' : 'hover:bg-slate-700/70 text-slate-300'">
-                    <svg viewBox="0 0 20 20" class="w-5 h-5" fill="currentColor"><rect x="3" y="3" width="14" height="14" rx="1.5"/></svg>
-                    <span class="text-[8px] leading-none">FRT</span>
-                </button>
-                <button @click="setViewDirection('back')" title="Nhìn từ Sau (Back)"
-                    class="w-8 h-8 flex flex-col items-center justify-center rounded-lg transition text-[9px] font-bold gap-0.5"
-                    :class="isLightBackground ? 'hover:bg-slate-200/70 text-slate-600' : 'hover:bg-slate-700/70 text-slate-300'">
-                    <svg viewBox="0 0 20 20" class="w-5 h-5" fill="currentColor"><rect x="3" y="3" width="14" height="14" rx="1.5" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="3" x2="17" y2="17" stroke="currentColor" stroke-width="1.5"/><line x1="17" y1="3" x2="3" y2="17" stroke="currentColor" stroke-width="1.5"/></svg>
-                    <span class="text-[8px] leading-none">BCK</span>
-                </button>
-                <div class="w-px h-6 mx-0.5" :class="isLightBackground ? 'bg-slate-300' : 'bg-slate-700'"></div>
-                <button @click="setViewDirection('left')" title="Nhìn từ Trái (Left)"
-                    class="w-8 h-8 flex flex-col items-center justify-center rounded-lg transition text-[9px] font-bold gap-0.5"
-                    :class="isLightBackground ? 'hover:bg-slate-200/70 text-slate-600' : 'hover:bg-slate-700/70 text-slate-300'">
-                    <svg viewBox="0 0 20 20" class="w-5 h-5" fill="currentColor"><path d="M15 3 L5 10 L15 17 Z"/></svg>
-                    <span class="text-[8px] leading-none">LFT</span>
-                </button>
-                <button @click="setViewDirection('right')" title="Nhìn từ Phải (Right)"
-                    class="w-8 h-8 flex flex-col items-center justify-center rounded-lg transition text-[9px] font-bold gap-0.5"
-                    :class="isLightBackground ? 'hover:bg-slate-200/70 text-slate-600' : 'hover:bg-slate-700/70 text-slate-300'">
-                    <svg viewBox="0 0 20 20" class="w-5 h-5" fill="currentColor"><path d="M5 3 L15 10 L5 17 Z"/></svg>
-                    <span class="text-[8px] leading-none">RGT</span>
-                </button>
-                <div class="w-px h-6 mx-0.5" :class="isLightBackground ? 'bg-slate-300' : 'bg-slate-700'"></div>
-                <button @click="toggleCameraProjection" :aria-pressed="!isOrthographic"
-                    :title="isOrthographic ? 'Bật Perspective' : 'Tắt Perspective (chuyển sang Orthographic)'"
-                    class="w-10 h-8 flex flex-col items-center justify-center rounded-lg transition text-[9px] font-bold"
-                    :class="!isOrthographic ? (isLightBackground ? 'bg-indigo-100 text-indigo-700' : 'bg-indigo-900/60 text-indigo-300') : (isLightBackground ? 'hover:bg-slate-200/70 text-slate-600' : 'hover:bg-slate-700/70 text-slate-300')">
-                    <i class="ph-bold ph-cube text-sm"></i>
-                    <span class="text-[8px] leading-none">{{ isOrthographic ? 'ORTHO' : 'PERSP' }}</span>
-                </button>
-                <div class="w-px h-6 mx-0.5" :class="isLightBackground ? 'bg-slate-300' : 'bg-slate-700'"></div>
-                <label class="flex items-center gap-1.5 px-1 text-[9px] font-semibold" title="Độ mờ toàn bộ mô hình">
-                    <i class="ph-bold ph-eye text-sm"></i>
-                    <input v-model.number="modelOpacityPercent" @input="updateModelOpacity" @change="persistModelOpacity"
-                        type="range" min="0" max="100" step="1" class="w-16 accent-sky-500 cursor-pointer"
-                        aria-label="Độ mờ toàn bộ mô hình">
-                    <span class="w-7 text-right font-mono">{{ modelOpacityPercent }}%</span>
-                </label>
-            </div>
-
             <!-- Hướng dẫn ban đầu -->
-            <div v-if="!hasLoadedIfc && !isLoading" 
-                class="absolute top-4 left-4 z-10 max-w-sm backdrop-blur-md border rounded-xl p-4 shadow-2xl"
+            <div v-if="!hasLoadedIfc && !isLoading && !isSampleModel" :style="{ left: `${(showLeftPanel ? leftPanelWidth : 0) + 16}px` }"
+                class="absolute top-4 z-10 max-w-sm backdrop-blur-md border rounded-xl p-4 shadow-2xl"
                 :class="isLightBackground ? 'bg-white/90 border-slate-300 text-slate-800' : 'bg-slate-900/90 border-slate-700/80 text-white'">
                 <div class="flex items-start gap-3">
                     <div class="p-2 rounded-lg bg-amber-500/10 text-amber-500 shrink-0 mt-0.5">
@@ -1012,7 +965,8 @@
             </div>
 
             <!-- Thanh trạng thái dưới đáy Canvas -->
-            <div class="absolute bottom-3 left-4 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] backdrop-blur px-3 py-1.5 rounded-full border pointer-events-none"
+            <div :style="{ left: `${(showLeftPanel ? leftPanelWidth : 0) + 16}px` }"
+                class="absolute bottom-3 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] backdrop-blur px-3 py-1.5 rounded-3xl border pointer-events-none select-none"
                 :class="isLightBackground ? 'bg-white/80 border-slate-300 text-slate-700 shadow-sm' : 'bg-slate-900/80 border-slate-800 text-slate-400'">
                 <span class="flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full" :class="wasmReady ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'"></span>
@@ -1029,7 +983,29 @@
                 <span v-if="selectedMeshes.length > 0">|</span>
                 <span v-if="selectedMeshes.length > 0" class="text-amber-500 font-bold">Đã chọn: {{ selectedMeshes.length }}</span>
                 <span>|</span>
-                <span class="font-medium" :class="isOrthographic ? 'text-indigo-500' : 'text-blue-500'">{{ isOrthographic ? '[Ortho]' : '[Persp]' }}</span>
+                <!-- Độ mờ toàn bộ mô hình (bên trái nút Persp/Ortho) -->
+                <label class="pointer-events-auto flex items-center gap-1.5 cursor-pointer" title="Độ mờ toàn bộ mô hình">
+                    <i class="ph-bold ph-eye text-sm"></i>
+                    <input v-model.number="modelOpacityPercent" @input="updateModelOpacity" @change="persistModelOpacity"
+                        type="range" min="0" max="100" step="1" class="w-20 accent-sky-500 cursor-pointer"
+                        aria-label="Độ mờ toàn bộ mô hình">
+                    <span class="w-8 text-right font-mono">{{ modelOpacityPercent }}%</span>
+                </label>
+                <!-- Nút chuyển nền sáng / tối (đồng bộ với Cài đặt > Nền view) -->
+                <button type="button" @click="setBackgroundTheme(!isLightBackground)"
+                    class="pointer-events-auto w-7 h-6 flex items-center justify-center rounded-md border text-sm leading-none cursor-pointer transition active:scale-95"
+                    :class="isLightBackground ? 'bg-amber-50 border-amber-300 hover:bg-amber-100' : 'bg-slate-800 border-slate-600 hover:bg-slate-700'"
+                    :title="isLightBackground ? 'Đang nền sáng - bấm để chuyển nền tối' : 'Đang nền tối - bấm để chuyển nền sáng'"
+                    :aria-label="isLightBackground ? 'Chuyển sang nền tối' : 'Chuyển sang nền sáng'">{{ isLightBackground ? '☀️' : '🌚' }}</button>
+                <!-- Nút chuyển Perspective / Orthographic -->
+                <button type="button" @click="toggleCameraProjection"
+                    class="pointer-events-auto px-2.5 py-0.5 rounded-md border text-[11px] font-semibold cursor-pointer transition active:scale-95"
+                    :class="isOrthographic
+                        ? (isLightBackground ? 'bg-indigo-100 border-indigo-300 text-indigo-700 hover:bg-indigo-200' : 'bg-indigo-900/60 border-indigo-500/60 text-indigo-300 hover:bg-indigo-800/70')
+                        : (isLightBackground ? 'bg-blue-100 border-blue-300 text-blue-700 hover:bg-blue-200' : 'bg-blue-900/60 border-blue-500/60 text-blue-300 hover:bg-blue-800/70')"
+                    :title="isOrthographic ? 'Đang Orthographic - bấm để chuyển sang Perspective' : 'Đang Perspective - bấm để chuyển sang Orthographic'">
+                    {{ isOrthographic ? 'Ortho' : 'Persp' }}
+                </button>
                 <span v-if="isCropBoxActive">|</span>
                 <span v-if="isCropBoxActive" class="text-cyan-500 font-semibold">[CropBox 6 Mặt]</span>
                 <span v-if="hoveredType">|</span>
@@ -1060,16 +1036,16 @@
 
         <!-- 3. PANEL BÊN PHẢI: TRA CỨU, CHỈNH SỬA THUỘC TÍNH (ATTRIBUTE) & PROPERTY SETS -->
         <div v-show="showRightPanel" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng panel phải"
-            title="Kéo để thay đổi độ rộng panel phải" tabindex="0"
+            title="Kéo để thay đổi độ rộng panel phải" tabindex="0" :style="{ right: `${rightPanelWidth}px` }"
             @pointerdown="startPanelResize('right', $event)" @pointermove="updatePanelResize"
             @pointerup="endPanelResize" @pointercancel="endPanelResize" @lostpointercapture="endPanelResize"
             @keydown.right.prevent="adjustPanelWidth('right', -16)" @keydown.left.prevent="adjustPanelWidth('right', 16)"
-            class="group relative z-30 hidden sm:flex w-1.5 shrink-0 cursor-col-resize touch-none items-center justify-center bg-slate-800/80 hover:bg-sky-500/60 active:bg-sky-500 transition-colors">
+            class="group absolute top-0 bottom-0 z-30 hidden sm:flex w-1.5 cursor-col-resize touch-none items-center justify-center bg-slate-800/80 hover:bg-sky-500/60 active:bg-sky-500 transition-colors">
             <span class="h-10 w-0.5 rounded bg-slate-500 group-hover:bg-white"></span>
         </div>
 
         <aside v-show="showRightPanel" :style="{ width: `${rightPanelWidth}px` }"
-            class="min-w-[240px] max-w-[640px] bg-slate-900 border-l border-slate-800 flex flex-col z-20 shrink-0 shadow-2xl absolute sm:relative right-0 top-0 bottom-0 select-text">
+            class="min-w-[240px] max-w-[640px] bg-slate-900/80 border-l border-slate-800 flex flex-col z-20 shadow-2xl absolute right-0 top-0 bottom-0 select-text">
             
             <div class="h-11 px-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
                 <div class="flex items-center gap-2">
@@ -1240,12 +1216,9 @@
                             <div class="divide-y divide-slate-800/60 text-xs">
                                 <div v-for="(prop, pIdx) in pset.properties" :key="pIdx" 
                                     @contextmenu.prevent="openContextMenu($event, prop.name, prop.value)"
-                                    class="px-3 py-1.5 flex flex-col gap-0.5 hover:bg-slate-800/40 cursor-context-menu select-text">
-                                    <span class="text-[11px] font-medium text-slate-400 flex items-center justify-between">
-                                        <span>{{ prop.name }}</span>
-                                        <i class="ph-bold ph-dots-three-vertical text-[10px] text-slate-500"></i>
-                                    </span>
-                                    <span class="text-slate-200 font-mono text-[11px] break-all">{{ prop.value }}</span>
+                                    class="px-3 py-1.5 flex items-center justify-between gap-3 hover:bg-slate-800/40 cursor-context-menu select-text">
+                                    <span class="shrink-0 text-[11px] font-medium text-slate-400">{{ prop.name }}</span>
+                                    <span class="min-w-0 text-right text-slate-200 font-mono text-[11px] break-all">{{ prop.value }}</span>
                                 </div>
                             </div>
                         </div>
@@ -1263,12 +1236,9 @@
                     <div class="bg-slate-950/60 border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800/80">
                         <div v-for="(val, key) in selectedObject.attributes" :key="key" 
                             @contextmenu.prevent="openContextMenu($event, key, val)"
-                            class="px-3 py-1.5 text-xs flex flex-col gap-0.5 hover:bg-slate-800/40 cursor-context-menu select-text">
-                            <span class="text-[11px] font-medium text-slate-400 flex items-center justify-between">
-                                <span>{{ key }}</span>
-                                <i class="ph-bold ph-dots-three-vertical text-[10px] text-slate-500"></i>
-                            </span>
-                            <span class="text-slate-200 font-mono text-[11px] break-all">{{ val }}</span>
+                            class="px-3 py-1.5 text-xs flex items-center justify-between gap-3 hover:bg-slate-800/40 cursor-context-menu select-text">
+                            <span class="shrink-0 text-[11px] font-medium text-slate-400">{{ key }}</span>
+                            <span class="min-w-0 text-right text-slate-200 font-mono text-[11px] break-all">{{ val }}</span>
                         </div>
                     </div>
                 </div>
@@ -1289,8 +1259,76 @@
 
     </div>
 
+            <div v-if="showIntroPanel" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+                style="z-index: 10000" @click.self="closeIntroPanel">
+                <section class="w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-700/80 bg-slate-900 shadow-2xl">
+                    <div class="relative overflow-hidden border-b border-slate-800 px-6 py-5 sm:px-8">
+                        <div class="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-blue-500/10 blur-2xl"></div>
+                        <div class="absolute -left-12 bottom-[-5rem] h-40 w-40 rounded-full bg-emerald-500/10 blur-2xl"></div>
+                        <div class="relative flex items-start gap-4">
+                            <div class="shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center shadow-lg">
+                                <i class="ph-bold ph-cube text-2xl text-white"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-400">{{ introPanelContent.badge }}</div>
+                                <h2 class="text-xl sm:text-2xl font-bold text-white">{{ introPanelContent.title }}</h2>
+                                <p class="mt-2 max-w-2xl text-xs sm:text-sm leading-relaxed text-slate-300">{{ introPanelContent.subtitle }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-3 p-4 sm:grid-cols-2 sm:p-6">
+                        <article v-for="feature in introPanelContent.features" :key="feature.title"
+                            :class="feature.wide ? 'sm:col-span-2' : ''"
+                            class="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                            <div class="flex items-center gap-2 text-emerald-400">
+                                <i :class="`ph-bold ${feature.icon}`" class="text-lg"></i>
+                                <h3 class="text-sm font-bold text-slate-100">{{ feature.title }}</h3>
+                            </div>
+                            <p class="mt-2 text-xs leading-relaxed text-slate-400">{{ feature.text }}</p>
+                        </article>
+                    </div>
+
+                    <div class="grid gap-3 px-4 pb-4 sm:grid-cols-2 sm:px-6">
+                        <article class="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-blue-300">{{ introPanelContent.advantageTitle }}</h3>
+                            <p class="mt-2 text-xs leading-relaxed text-slate-300">{{ introPanelContent.advantageText }}</p>
+                        </article>
+                        <article class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-amber-300">{{ introPanelContent.roadmapTitle }}</h3>
+                            <p class="mt-2 text-xs leading-relaxed text-slate-300">{{ introPanelContent.roadmapText }}</p>
+                        </article>
+                    </div>
+
+                    <div class="sticky bottom-0 flex items-center justify-between border-t border-slate-800 bg-slate-900 px-4 py-3 sm:px-6">
+                        <label class="flex items-center gap-2 text-[11px] text-slate-400">
+                            <input type="checkbox" v-model="dontShowIntroAgain" class="rounded border-slate-600 bg-slate-950 text-emerald-500">
+                            Không hiển thị lại
+                        </label>
+                        <button type="button" @click="closeIntroPanel"
+                            class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-lg hover:bg-emerald-500">
+                            Bắt đầu sử dụng
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <div v-if="showTransportProfileModal" class="fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4">
+                <form @submit.prevent="saveTransportProfile" class="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-4 shadow-2xl space-y-3">
+                    <h3 class="text-sm font-bold text-slate-100">Lưu bộ tọa độ</h3>
+                    <label class="block text-[11px] text-slate-400">
+                        Tên profile
+                        <input ref="transportProfileNameInput" v-model="transportProfileName" type="text" maxlength="80" required
+                            class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                    </label>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" @click="showTransportProfileModal = false" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs">Hủy</button>
+                        <button type="submit" class="px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold">Lưu profile</button>
+                    </div>
+                </form>
+            </div>
     <!-- 4. CONTEXT MENU -->
-    <div v-if="contextMenu.visible" 
+    <div v-if="contextMenu.visible" data-context-menu
         :style="{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }"
         class="fixed z-50 w-56 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden py-1 text-xs select-none">
         <div class="px-3 py-1.5 border-b border-slate-800 bg-slate-950/50">
