@@ -7,6 +7,7 @@ import { fitCameraToModel } from '../scene/scene.js';
 import { updateSelectionOutlines } from '../selection/selection.js';
 import { clashModeActive, isCropBoxActive, rt, showTransportProfileModal, sourceFiles, transportHistory, transportInputFields, transportInputs, transportMatrix, transportOperations, transportProfileName, transportProfileNameInput, transportProfileStorageKey, transportProfiles, transportRotationAxis } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
+import { t } from '../i18n/index.js';
 
 export const createTransportProfileId = () => `profile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 export const getTransportInputValues = () => {
@@ -14,7 +15,7 @@ export const getTransportInputValues = () => {
     transportInputFields.forEach(field => {
         const input = transportInputs[field];
         if (input === '' || input === null || !Number.isFinite(Number(input))) {
-            throw new Error(`Giá trị "${field}" phải là một số hợp lệ.`);
+            throw new Error(t('Giá trị "{0}" phải là một số hợp lệ.', [field]));
         }
         values[field] = Number(input);
     });
@@ -23,12 +24,12 @@ export const getTransportInputValues = () => {
 
 export const normalizeTransportProfile = (profile) => {
     if (!profile || typeof profile.name !== 'string' || !profile.name.trim()) {
-        throw new Error('Mỗi profile cần có tên.');
+        throw new Error(t('Mỗi profile cần có tên.'));
     }
     const values = {};
     transportInputFields.forEach(field => {
         if (profile[field] === '' || profile[field] === null || !Number.isFinite(Number(profile[field]))) {
-            throw new Error(`Profile "${profile.name}" có giá trị "${field}" không hợp lệ.`);
+            throw new Error(t('Profile "{0}" có giá trị "{1}" không hợp lệ.', [profile.name, field]));
         }
         values[field] = Number(profile[field]);
     });
@@ -45,11 +46,11 @@ export const loadTransportProfiles = () => {
         const stored = localStorage.getItem(transportProfileStorageKey);
         if (!stored) return;
         const parsed = JSON.parse(stored);
-        if (!Array.isArray(parsed)) throw new Error('Danh sách profile đã lưu không đúng định dạng.');
+        if (!Array.isArray(parsed)) throw new Error(t('Danh sách profile đã lưu không đúng định dạng.'));
         transportProfiles.value = parsed.map(normalizeTransportProfile);
     } catch (error) {
         console.error('Không thể đọc profile transport từ localStorage:', error);
-        showToast('Lỗi đọc profile', error.message || 'Không thể đọc các profile đã lưu.');
+        showToast(t('Lỗi đọc profile'), error.message || t('Không thể đọc các profile đã lưu.'));
     }
 };
 
@@ -59,7 +60,7 @@ export const persistTransportProfiles = () => {
         return true;
     } catch (error) {
         console.error('Không thể lưu profile transport:', error);
-        showToast('Lỗi lưu profile', error.message || 'Không thể lưu profile vào localStorage.');
+        showToast(t('Lỗi lưu profile'), error.message || t('Không thể lưu profile vào localStorage.'));
         return false;
     }
 };
@@ -72,14 +73,14 @@ export const openTransportProfileDialog = async () => {
         await nextTick();
         transportProfileNameInput.value?.focus();
     } catch (error) {
-        showToast('Thông số không hợp lệ', error.message);
+        showToast(t('Thông số không hợp lệ'), error.message);
     }
 };
 
 export const saveTransportProfile = () => {
     const name = transportProfileName.value.trim();
     if (!name) {
-        showToast('Thiếu tên profile', 'Nhập tên cho bộ tọa độ trước khi lưu.');
+        showToast(t('Thiếu tên profile'), t('Nhập tên cho bộ tọa độ trước khi lưu.'));
         return;
     }
     try {
@@ -95,16 +96,16 @@ export const saveTransportProfile = () => {
             return;
         }
         showTransportProfileModal.value = false;
-        showToast('Đã lưu profile', `Đã lưu bộ tọa độ "${name}" vào localStorage.`, 'success');
+        showToast(t('Đã lưu profile'), t('Đã lưu bộ tọa độ "{0}" vào localStorage.', [name]), 'success');
     } catch (error) {
-        showToast('Không thể lưu profile', error.message);
+        showToast(t('Không thể lưu profile'), error.message);
     }
 };
 
 export const useTransportProfile = (profile) => {
     const normalized = normalizeTransportProfile(profile);
     transportInputFields.forEach(field => { transportInputs[field] = normalized[field]; });
-    showToast('Đã nạp profile', `Đã điền thông số từ "${profile.name}".`, 'success');
+    showToast(t('Đã nạp profile'), t('Đã điền thông số từ "{0}".', [profile.name]), 'success');
 };
 
 export const deleteTransportProfile = (profile) => {
@@ -126,10 +127,10 @@ export const exportTransportProfiles = () => {
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        showToast('Đã xuất JSON', `Đã xuất ${transportProfiles.value.length} profile.`, 'success');
+        showToast(t('Đã xuất JSON'), t('Đã xuất {0} profile.', [transportProfiles.value.length]), 'success');
     } catch (error) {
         console.error('Không thể xuất JSON profile:', error);
-        showToast('Lỗi xuất JSON', error.message || 'Không thể xuất file profile.');
+        showToast(t('Lỗi xuất JSON'), error.message || t('Không thể xuất file profile.'));
     }
 };
 
@@ -140,7 +141,7 @@ export const importTransportProfiles = async (event) => {
     try {
         const parsed = JSON.parse(await file.text());
         const incoming = Array.isArray(parsed) ? parsed : parsed?.profiles;
-        if (!Array.isArray(incoming)) throw new Error('JSON phải chứa một mảng profiles.');
+        if (!Array.isArray(incoming)) throw new Error(t('JSON phải chứa một mảng profiles.'));
         const normalized = incoming.map(normalizeTransportProfile);
         const existingIds = new Set(transportProfiles.value.map(profile => profile.id));
         normalized.forEach(profile => {
@@ -153,10 +154,10 @@ export const importTransportProfiles = async (event) => {
             transportProfiles.value = previous;
             return;
         }
-        showToast('Đã nhập JSON', `Đã nhập ${normalized.length} profile.`, 'success');
+        showToast(t('Đã nhập JSON'), t('Đã nhập {0} profile.', [normalized.length]), 'success');
     } catch (error) {
         console.error('Không thể nhập JSON profile:', error);
-        showToast('Lỗi nhập JSON', error.message || 'File JSON profile không hợp lệ.');
+        showToast(t('Lỗi nhập JSON'), error.message || t('File JSON profile không hợp lệ.'));
     }
 };
 
@@ -201,7 +202,7 @@ export const getIfcLengthUnitInMeters = (modelID) => {
 
     const scale = resolveUnitScale(unwrapIfcValue(lengthUnitRef));
     if (!Number.isFinite(scale) || scale <= 0) {
-        throw new Error('Không xác định được đơn vị chiều dài IFC; không thể chuyển đổi tọa độ an toàn.');
+        throw new Error(t('Không xác định được đơn vị chiều dài IFC; không thể chuyển đổi tọa độ an toàn.'));
     }
     return scale;
 };
@@ -220,7 +221,7 @@ export const getIfcRootPlacementIds = (modelID) => {
 export const applyIfcTransportToModel = (modelID, unitMeters) => {
     if (transportOperations.length === 0) return;
     const roots = getIfcRootPlacementIds(modelID);
-    if (roots.length === 0) throw new Error('Không tìm thấy IfcLocalPlacement gốc để áp dụng tọa độ transport.');
+    if (roots.length === 0) throw new Error(t('Không tìm thấy IfcLocalPlacement gốc để áp dụng tọa độ transport.'));
 
     const elements = transportMatrix.elements;
     const x = elements[12] / unitMeters;
@@ -233,7 +234,7 @@ export const applyIfcTransportToModel = (modelID, unitMeters) => {
         Object.assign(entity, attributes);
         rt.ifcAPI.WriteLine(modelID, entity);
         if (!Number.isInteger(entity.expressID) || entity.expressID < 0) {
-            throw new Error(`Không thể tạo thực thể IFC ${rt.ifcAPI.GetNameFromTypeCode(typeCode)}.`);
+            throw new Error(t('Không thể tạo thực thể IFC {0}.', [rt.ifcAPI.GetNameFromTypeCode(typeCode)]));
         }
         return entity.expressID;
     };
@@ -305,18 +306,18 @@ export const resetTransportState = () => {
 export const applyTransport = () => {
     if (clashModeActive.value) clearClashResults();
     if (sourceFiles.value.length === 0) {
-        showToast('Chưa có file IFC', 'Mở ít nhất một file IFC trước khi transport.');
+        showToast(t('Chưa có file IFC'), t('Mở ít nhất một file IFC trước khi dịch chuyển.'));
         return;
     }
     try {
         const values = getTransportInputValues();
         if (values.angleDegrees % 360 === 0 && values.vectorX === 0 && values.vectorY === 0 && values.vectorZ === 0) {
-            showToast('Không có thay đổi', 'Nhập góc xoay hoặc vector move khác 0 trước khi transport.');
+            showToast(t('Không có thay đổi'), t('Nhập góc xoay hoặc vector dịch chuyển khác 0 trước khi dịch chuyển.'));
             return;
         }
         sourceFiles.value.forEach(source => {
             if (getIfcRootPlacementIds(source.modelID).length === 0) {
-                throw new Error(`Không tìm thấy placement gốc trong "${source.name}".`);
+                throw new Error(t('Không tìm thấy placement gốc trong "{0}".', [source.name]));
             }
         });
 
@@ -348,17 +349,17 @@ export const applyTransport = () => {
         rebuildTransportMatrix();
         fitCameraToModel();
         if (isCropBoxActive.value) resetCropBoxToModel();
-        showToast('Transport thành công', 'Đã áp dụng xoay và move cho tất cả file IFC đang mở.', 'success');
+        showToast(t('Dịch chuyển thành công'), t('Đã áp dụng xoay và dịch chuyển cho tất cả file IFC đang mở.'), 'success');
     } catch (error) {
         console.error('Lỗi transport IFC:', error);
-        showToast('Lỗi transport', error.message || 'Không thể áp dụng tọa độ transport.');
+        showToast(t('Lỗi dịch chuyển'), error.message || t('Không thể áp dụng tọa độ dịch chuyển.'));
     }
 };
 
 export const undoTransport = (entry) => {
     const latestOperation = transportOperations[transportOperations.length - 1];
     if (!latestOperation || latestOperation.id !== entry.id) {
-        showToast('Không thể undo', 'Chỉ có thể undo lượt transport mới nhất.');
+        showToast(t('Không thể hoàn tác'), t('Chỉ có thể hoàn tác lượt dịch chuyển mới nhất.'));
         return;
     }
     transportOperations.pop();
@@ -366,5 +367,5 @@ export const undoTransport = (entry) => {
     rebuildTransportMatrix();
     fitCameraToModel();
     if (isCropBoxActive.value) resetCropBoxToModel();
-    showToast('Đã undo transport', 'Đã khôi phục tọa độ trước lượt transport gần nhất.', 'success');
+    showToast(t('Đã hoàn tác dịch chuyển'), t('Đã khôi phục tọa độ trước lượt dịch chuyển gần nhất.'), 'success');
 };

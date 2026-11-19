@@ -3,6 +3,7 @@ import { getObjectMeshes, getPsetCacheKey } from '../core/helpers.js';
 import { buildAllGroupingCollections } from '../ifc/groups.js';
 import { attributeBaseline, editHistoryCount, editableAttributes, hasAttributeChanges, hasUnsavedChanges, psetCache, rt, selectedMeshes, selectedObject } from '../state/state.js';
 import { showToast } from './panels.js';
+import { t } from '../i18n/index.js';
 
 export const showPropertiesForMesh = (mesh) => {
     const box = new THREE.Box3();
@@ -125,9 +126,9 @@ export const extractRebarSpecificDetails = (lineData, attributes, psets, dimensi
     }
 
     return {
-        barDiameter: barDiameter || 'Chưa định nghĩa',
-        steelGrade: steelGrade || 'Chưa định nghĩa',
-        barLength: barLength || 'Chưa định nghĩa',
+        barDiameter: barDiameter || t('Chưa định nghĩa'),
+        steelGrade: steelGrade || t('Chưa định nghĩa'),
+        barLength: barLength || t('Chưa định nghĩa'),
         tagMark: tagMark || '—'
     };
 };
@@ -167,7 +168,7 @@ export const saveAttributeChanges = () => {
     attributeBaseline.Description = editableAttributes.Description;
     hasUnsavedChanges.value = true;
     buildAllGroupingCollections();
-    showToast('Đã lưu thuộc tính', `Đã cập nhật cho ${selectedMeshes.value.length} đối tượng.`, 'success');
+    showToast(t('Đã lưu thuộc tính'), t('Đã cập nhật cho {0} đối tượng.', [selectedMeshes.value.length]), 'success');
 };
 
 export const resetEditableAttributes = () => {

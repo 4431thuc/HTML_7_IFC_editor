@@ -1,5 +1,6 @@
 import { computed, toRaw } from 'vue';
 import { exportListVersion, pendingDeletedExpressIDs, rt } from '../state/state.js';
+import { t } from '../i18n/index.js';
 
 export const requestRender = () => { rt.needsRender = true; };
 export const createMeshKey = (sourceId, expressID) => `${sourceId || 'demo'}:${expressID}`;
@@ -19,7 +20,7 @@ export const visibleExportItems = computed(() => {
                 expressID: mesh.userData.expressID,
                 type: mesh.userData.type,
                 name: mesh.userData.name,
-                fileName: mesh.userData.sourceFileName || 'Mô hình mẫu'
+                fileName: mesh.userData.sourceFileName || t('Mô hình mẫu')
             });
         }
     });

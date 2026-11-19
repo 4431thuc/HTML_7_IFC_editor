@@ -6,6 +6,7 @@ import { createEdgeOutline } from './display.js';
 import { fitCameraToModel } from './scene.js';
 import { ENTITY_DEFAULT_COLORS, REBAR_DIAMETER_COLORS, parseDiameterMm } from '../state/constants.js';
 import { clippingPlanes, isCropBoxActive, isSampleModel, rt, stats } from '../state/state.js';
+import { t } from '../i18n/index.js';
 
 export const getRebarColorByDiameter = (diameterMm) => {
     const dia = Math.round(parseDiameterMm(diameterMm));
@@ -202,13 +203,13 @@ const drawSampleInfoLabel = (canvas) => {
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#0f172a';
     ctx.font = font(66, 700);
-    ctx.fillText('Mô hình mẫu Cột & Cốt thép 3D', textX, pad + 6);
+    ctx.fillText(t('Mô hình mẫu Cột & Cốt thép 3D'), textX, pad + 6);
 
     // Đoạn mô tả: các cụm có màu riêng, tự xuống dòng
     const segments = [
-        ['View nền sáng rõ, thép phân màu theo ', '#475569'], ['Phi (Ø)', '#f59e0b'],
-        ['. Bấm ', '#475569'], ['CropBox', '#0891b2'],
-        [' để kéo mũi tên 6 mặt độc lập, hoặc đổi sang ', '#475569'], ['Orthographic', '#4f46e5'], ['!', '#475569']
+        [t('View nền sáng rõ, thép phân màu theo '), '#475569'], [t('Phi (Ø)'), '#f59e0b'],
+        [t('. Bấm '), '#475569'], ['CropBox', '#0891b2'],
+        [t(' để kéo mũi tên 6 mặt độc lập, hoặc đổi sang '), '#475569'], ['Orthographic', '#4f46e5'], ['!', '#475569']
     ];
     ctx.font = font(48);
     const lineHeight = 70;
@@ -231,7 +232,7 @@ const drawSampleInfoLabel = (canvas) => {
     const dividerY = h - pad - 110;
     ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
     ctx.fillRect(pad, dividerY, w - pad * 2, 4);
-    const hints = [['Xoay: Trái', '#2563eb'], ['Pan: Giữa', '#2563eb'], ['Dịch: Phải', '#2563eb']];
+    const hints = [[t('Xoay: Trái'), '#2563eb'], [t('Pan: Giữa'), '#2563eb'], [t('Dịch: Phải'), '#2563eb']];
     const colWidth = (w - pad * 2) / hints.length;
     ctx.font = font(50, 500);
     hints.forEach(([text, color], i) => {
@@ -245,6 +246,16 @@ const drawSampleInfoLabel = (canvas) => {
     });
 };
 
+let sampleLabelCanvas = null;
+
+// Vẽ lại bảng thông tin mẫu khi đổi ngôn ngữ
+export const redrawSampleInfoLabel = () => {
+    if (!sampleLabelCanvas) return;
+    drawSampleInfoLabel(sampleLabelCanvas.canvas);
+    sampleLabelCanvas.texture.needsUpdate = true;
+    requestRender();
+};
+
 const createSampleInfoLabel = () => {
     // Vùng phẳng trên sàn S1, né cột C1 và dầm D1 ở mép sau-trái
     const slabTopY = 3.65 + 0.125;
@@ -256,6 +267,7 @@ const createSampleInfoLabel = () => {
     drawSampleInfoLabel(canvas);
 
     const texture = new THREE.CanvasTexture(canvas);
+    sampleLabelCanvas = { canvas, texture };
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 8;
     // Vẽ lại khi font Inter tải xong để chữ không bị lệch

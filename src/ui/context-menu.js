@@ -3,6 +3,7 @@ import { updateEdgesVisibility } from '../ifc/groups.js';
 import { updateSelectionDimmingEffect } from '../selection/selection.js';
 import { contextMenu, groupSearchQuery, leftActiveTab, psetCache, rt, selectedMeshes } from '../state/state.js';
 import { showToast } from './panels.js';
+import { t } from '../i18n/index.js';
 
 // --- 8. CONTEXT MENU ---
 export const openContextMenu = (event, key, val) => {
@@ -77,6 +78,6 @@ export const contextMenuAction = (action) => {
     } else if (action === 'filterWithAttribute') {
         leftActiveTab.value = 'groups';
         groupSearchQuery.value = contextMenu.attrValue;
-        showToast('Filter with attribute', `Đã áp bộ lọc: "${contextMenu.attrValue}"`, 'success');
+        showToast(t('Lọc theo giá trị'), t('Đã áp bộ lọc: "{0}"', [contextMenu.attrValue]), 'success');
     }
 };

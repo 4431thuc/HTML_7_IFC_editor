@@ -66,6 +66,16 @@ export const showTransportProfileModal = ref(false);
 export const transportProfileName = ref('');
 export const transportProfileNameInput = ref(null);
 
+// Thông tin cấp dự án của từng file IFC (xem ifc/project-info.js)
+export const projectInfos = reactive({});
+export const projectInfoSourceId = ref(null);
+export const projectHeaderOverrides = reactive({});
+export const currentProjectInfo = computed(() => projectInfos[projectInfoSourceId.value] ?? null);
+export const projectInfoDirty = computed(() => {
+    const info = currentProjectInfo.value;
+    return !!info && info.sections.some(section => section.fields.some(field => field.value !== field.original));
+});
+
 // Tab Panels
 export const showLeftPanel = ref(true);
 export const showRightPanel = ref(false);
@@ -78,9 +88,23 @@ export const clashVolume = ref(0);
 export const clashError = ref('');
 export const clashItems = ref([]);
 export const selectedClashId = ref(null);
+// --- ĐO ĐẠC (DIMENSION): mỗi nhóm gồm 2 điểm world (mét) và khoảng cách giữa chúng ---
+export const dimModeActive = ref(false);
+export const dimItems = ref([]);
+export const selectedDimId = ref(null);
+export const dimGroup = new THREE.Group();
+dimGroup.name = 'Dimensions';
 export const clashTypeA = ref('*');
 export const clashTypeB = ref('*');
 export const clashToleranceMm = ref(0);
+// Trạng thái hiển thị ở thanh trạng thái: chữ (khóa tiếng Việt) và màu nút tròn, đổi theo chế độ đang bật
+export const statusIndicator = computed(() => {
+    if (!wasmReady.value) return { label: 'Đang nạp WASM...', dotClass: 'bg-amber-500 animate-pulse' };
+    if (dimModeActive.value) return { label: 'Chế độ đo đạc', dotClass: 'bg-red-500 animate-pulse' };
+    if (clashBusy.value) return { label: 'Đang kiểm tra va chạm', dotClass: 'bg-blue-500 animate-pulse' };
+    if (clashModeActive.value) return { label: 'Chế độ kết quả va chạm', dotClass: 'bg-blue-500' };
+    return { label: 'Sẵn sàng', dotClass: 'bg-emerald-500' };
+});
 export const leftPanelWidth = ref(320);
 export const rightPanelWidth = ref(384);
 export const groupCriterion = ref('name');
@@ -102,7 +126,17 @@ export const xrayOpacity = ref(0.18);
 export const isOrthographic = ref(false);
 
 // MÀU NỀN VIEW 3D: SÁNG (LIGHT) / TỐI (DARK)
-export const isLightBackground = ref(true);
+export const backgroundThemeStorageKey = 'ifc-editor-background-light';
+export const readStoredBackgroundLight = () => {
+    try {
+        const stored = localStorage.getItem(backgroundThemeStorageKey);
+        return stored === null ? true : stored === 'true';
+    } catch (error) {
+        console.error('Không thể đọc cài đặt màu nền:', error);
+        return true;
+    }
+};
+export const isLightBackground = ref(readStoredBackgroundLight());
 // Mặc định nền sáng kỹ thuật sạch sẽ
 
 // CROPBOX (SECTION BOX 6 MẶT MŨI TÊN ĐỘC LẬP)
@@ -360,5 +394,17 @@ export const rt = {
     isMiddleMouseDown: false,
     isOrbiting: false,
     lastSelectedMeshes: new Set(),
+    orbitPivot: null,
+    dimPendingPoint: null,
+    dimPendingMarker: null,
+    dimPendingElement: null,
+    dimShapeMarkers: null,
+    dimSurfaceDisc: null,
+    dimHoverMarker: null,
+    intersectionToken: 0,
+    intersectionSignature: '',
+    dimPreview: null,
+    dimSnapLine: null,
+    dimSequence: 0,
     hoveredMesh: null
 };

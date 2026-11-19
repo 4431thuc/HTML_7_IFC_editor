@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import { getMeshKey, getObjectMeshes, requestRender } from '../core/helpers.js';
 import { queueSelectedForRemoval, toggleSelectedVisibility, updateEdgesVisibility } from '../ifc/groups.js';
 import { clearCropHandleHover, cropHandleWorldUnitsPerPixel, syncCropBoxGeometryAndPlanes, toggleCropBox, updateCropHandleHover, updateCropHandleScales } from '../scene/cropbox.js';
+import { cancelPendingDimension, clearDimensionHover, handleDimensionClick, toggleDimensionMode, updateDimensionHover } from '../dimension/dimension.js';
 import { toggleXRayMode } from '../scene/display.js';
-import { fitCameraToVisibleModel } from '../scene/scene.js';
+import { fitCameraToVisibleModel, resetOrbitPivotTracking } from '../scene/scene.js';
 import { applyHoverMaterial, restoreMeshMaterial, syncBatchVisibility } from '../scene/rendering.js';
 import { clearSelection, handleMeshSelection, isMeshSelected, resolveHitElement, revealMeshInGroups, updateSelectionDimmingEffect } from './selection.js';
-import { boxEnd, boxStart, clashModeActive, cropBounds, cropGroup, handleMeshes, hoveredType, isBoxSelecting, isCropBoxActive, isLoading, isShiftPressed, leftActiveTab, mouse, overlayByElement, pendingDeletedExpressIDs, raycaster, rt, selectedMeshes, showRightPanel } from '../state/state.js';
+import { boxEnd, boxStart, clashModeActive, cropBounds, cropGroup, dimModeActive, handleMeshes, hoveredType, isBoxSelecting, isCropBoxActive, isLoading, isShiftPressed, leftActiveTab, mouse, overlayByElement, pendingDeletedExpressIDs, raycaster, rt, selectedMeshes, showRightPanel } from '../state/state.js';
 import { showPropertiesForMesh } from '../ui/properties.js';
+import { t } from '../i18n/index.js';
 
 export const updateMouseCoords = (event) => {
     const rect = rt.renderer.domElement.getBoundingClientRect();
@@ -99,6 +101,18 @@ export const onPointerDown = (event) => {
         boxEnd.y = event.clientY;
     } else if (event.button === 0) {
         rt.isOrbiting = true;
+        // Click trúng mesh: lấy điểm đó làm tâm xoay view
+        rt.orbitPivot = null;
+        if (!isLoading.value && rt.modelGroup.children.length > 0) {
+            updateMouseCoords(event);
+            raycaster.setFromCamera(mouse, rt.camera);
+            const pivotHits = getVisibleModelIntersections();
+            if (pivotHits.length > 0) {
+                rt.orbitPivot = pivotHits[0].point.clone();
+                resetOrbitPivotTracking();
+            }
+        }
+        if (dimModeActive.value && rt.renderer.domElement.style.cursor === 'grab') rt.renderer.domElement.style.cursor = 'grabbing';
     }
 };
 
@@ -173,6 +187,14 @@ export const onPointerMove = (event) => {
     rt.hoveredMesh = null;
     hoveredType.value = '';
 
+    // Chế độ đo: không highlight cấu kiện, chỉ hiện quả cầu nhỏ tại điểm sẽ được chọn
+    if (dimModeActive.value) {
+        // Không có gì để bắt điểm (không trung, đối tượng ẩn, vùng bị CropBox cắt): cursor bàn tay như khi xoay view
+        const pick = updateDimensionHover(intersects);
+        rt.renderer.domElement.style.cursor = pick ? 'crosshair' : 'grab';
+        return;
+    }
+
     if (intersects.length > 0) {
         const hit = resolveHitElement(intersects[0]);
         rt.hoveredMesh = hit;
@@ -181,7 +203,7 @@ export const onPointerMove = (event) => {
         if (!isMeshSelected(hit)) {
             applyHoverMaterial(hit);
         }
-        hoveredType.value = `${hit.userData.type || 'IFC'} #${hit.userData.expressID} (${hit.userData.name || 'Unnamed'})`;
+        hoveredType.value = `${hit.userData.type || 'IFC'} #${hit.userData.expressID} (${hit.userData.name || t('Chưa đặt tên')})`;
     } else {
         rt.renderer.domElement.style.cursor = 'default';
     }
@@ -193,6 +215,8 @@ export const onPointerUp = (event) => {
         rt.isMiddleMouseDown = false;
     }
     rt.isOrbiting = false;
+    rt.orbitPivot = null;
+    if (dimModeActive.value && rt.renderer.domElement.style.cursor === 'grabbing') rt.renderer.domElement.style.cursor = 'grab';
 
     // Kết thúc kéo tay cầm CropBox
     if (rt.cropDragHandle) {
@@ -220,6 +244,11 @@ export const onPointerUp = (event) => {
     raycaster.setFromCamera(mouse, rt.camera);
     const intersects = getVisibleModelIntersections();
 
+    if (dimModeActive.value) {
+        handleDimensionClick(intersects);
+        return;
+    }
+
     if (intersects.length > 0) {
         const hit = resolveHitElement(intersects[0]);
         const isMultiSelect = event.ctrlKey || event.metaKey;
@@ -234,10 +263,11 @@ export const onPointerLeave = () => {
     requestRender();
     if (rt.cropDragHandle) return;
     clearCropHandleHover();
+    clearDimensionHover();
     if (rt.hoveredMesh && !isMeshSelected(rt.hoveredMesh)) restoreMeshMaterial(rt.hoveredMesh);
     rt.hoveredMesh = null;
     hoveredType.value = '';
-    if (rt.renderer) rt.renderer.domElement.style.cursor = 'default';
+    if (rt.renderer) rt.renderer.domElement.style.cursor = dimModeActive.value ? 'grab' : 'default';
 };
 
 export const performBoxSelection = (start, end, isCtrl) => {
@@ -328,6 +358,11 @@ export const handleKeyDown = (event) => {
         event.preventDefault();
         toggleCropBox();
     }
+    if (!event.repeat && (event.key === 'd' || event.key === 'D') && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        toggleDimensionMode();
+    }
+    if (event.key === 'Escape' && dimModeActive.value && rt.dimPendingPoint) cancelPendingDimension();
     if (event.key === 'x' || event.key === 'X') toggleXRayMode();
     if (event.code === 'Space' && event.target.tagName !== 'BUTTON' && selectedMeshes.value.length > 0) {
         event.preventDefault();

@@ -2,11 +2,13 @@ import * as WebIFC from 'web-ifc';
 import { computed } from 'vue';
 import { getMeshKey, getPsetCacheKey, requestRender } from '../core/helpers.js';
 import { ensureEdgesForVisibleMeshes } from '../scene/display.js';
+import { ensureIntersectionEdges } from '../scene/intersections.js';
 import { getRebarColorByDiameter } from '../scene/sample-model.js';
 import { clearSelection, updateSelectionOutlines } from '../selection/selection.js';
 import { ENTITY_DEFAULT_COLORS, PALETTE } from '../state/constants.js';
 import { allGroups, clashModeActive, deletedItems, edgesGroup, editHistoryCount, exportListVersion, filterFaultyBars, groupCriterion, groupSearchQuery, hasUnsavedChanges, isRebarOnly, manuallyHiddenExpressIDs, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes, showEdges } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
+import { t } from '../i18n/index.js';
 
 export const indexAllPropertySets = (modelID, sourceId) => {
     try {
@@ -95,12 +97,12 @@ export const buildAllGroupingCollections = () => {
         posGrp.meshes.push(mesh);
 
         // 2. Name
-        const nameKey = ud.name || 'Chưa đặt tên (Unnamed)';
+        const nameKey = ud.name || 'Chưa đặt tên';
         if (!groupBuilders.name.has(nameKey)) {
             groupBuilders.name.set(nameKey, {
                 id: `name_${nameKey}`,
                 name: nameKey,
-                subText: ud.type || 'IFC Element',
+                subText: ud.type || 'Thực thể IFC',
                 isRebarGroup: isRebar,
                 color: getColor(nameKey),
                 count: 0,
@@ -119,7 +121,7 @@ export const buildAllGroupingCollections = () => {
             groupBuilders.objectType.set(objTypeKey, {
                 id: `obj_${objTypeKey}`,
                 name: objTypeKey,
-                subText: ud.type || 'IFC Element',
+                subText: ud.type || 'Thực thể IFC',
                 isRebarGroup: isRebar,
                 color: getColor(objTypeKey),
                 count: 0,
@@ -173,6 +175,8 @@ export const buildAllGroupingCollections = () => {
     allGroups.objectType = Array.from(groupBuilders.objectType.values()).sort(sortFn);
     allGroups.entity = Array.from(groupBuilders.entity.values()).sort(sortFn);
 
+    syncGroupVisibility();
+
     // Sắp xếp các đối tượng con bên trong mỗi nhóm theo Name tăng dần
     ['pos', 'name', 'objectType', 'entity'].forEach(key => {
         allGroups[key].forEach(grp => {
@@ -214,7 +218,7 @@ export const clashTypeOptions = computed(() => allGroups.entity.map(group => {
     const label = getEntityLabel(group.name);
     return {
         value: group.name,
-        label: label === 'Thực thể IFC' ? group.name : `${label} (${group.name})`
+        label: label === 'Thực thể IFC' ? group.name : `${t(label)} (${group.name})`
     };
 }));
 
@@ -225,68 +229,50 @@ export const filteredGroups = computed(() => {
     return list.filter(g => g.name.toLowerCase().includes(q) || g.subText.toLowerCase().includes(q));
 });
 
-export const toggleSingleGroupVisibility = (grp) => {
-    grp.visible = !grp.visible;
-    if (grp.visible) {
-        grp.meshes.forEach(mesh => manuallyHiddenExpressIDs.delete(getMeshKey(mesh)));
-    }
-    const groupVisibilityMap = buildGroupVisibilityMap();
-    grp.meshes.forEach(mesh => {
-        mesh.visible = shouldMeshBeVisible(mesh, groupVisibilityMap);
+// Ẩn/hiện nhóm = thêm/bớt khóa các đối tượng của nhóm vào manuallyHiddenExpressIDs
+// (nguồn sự thật duy nhất), nên mọi tiêu chí phân nhóm và bộ đếm "Ẩn" luôn đồng bộ.
+const setGroupObjectsHidden = (grp, hidden) => {
+    grp.objects.forEach(mesh => {
+        const key = getMeshKey(mesh);
+        if (hidden) manuallyHiddenExpressIDs.add(key);
+        else manuallyHiddenExpressIDs.delete(key);
     });
-    updateEdgesVisibility();
+};
+
+export const toggleSingleGroupVisibility = (grp) => {
+    setGroupObjectsHidden(grp, grp.visible);
+    updateAllMeshesVisibility();
 };
 
 export const setAllActiveGroupsVisibility = (visible) => {
-    const list = allGroups[groupCriterion.value] || [];
-    list.forEach(grp => {
-        grp.visible = visible;
-        if (visible) {
-            grp.meshes.forEach(mesh => manuallyHiddenExpressIDs.delete(getMeshKey(mesh)));
-        }
-    });
-    const groupVisibilityMap = buildGroupVisibilityMap();
-    list.forEach(grp => {
-        grp.meshes.forEach(mesh => {
-            mesh.visible = shouldMeshBeVisible(mesh, groupVisibilityMap);
+    (allGroups[groupCriterion.value] || []).forEach(grp => setGroupObjectsHidden(grp, !visible));
+    updateAllMeshesVisibility();
+};
+
+// Một nhóm được coi là hiện khi còn ít nhất một đối tượng chưa bị ẩn thủ công
+export const syncGroupVisibility = () => {
+    Object.values(allGroups).forEach(list => {
+        if (!Array.isArray(list)) return;
+        list.forEach(grp => {
+            grp.visible = grp.objects.some(mesh => !manuallyHiddenExpressIDs.has(getMeshKey(mesh)));
         });
     });
-    updateEdgesVisibility();
-    updateSelectionOutlines();
 };
 
-export const buildGroupVisibilityMap = () => {
-    const visibilityByName = new Map();
-    (allGroups[groupCriterion.value] || []).forEach(g => {
-        if (!visibilityByName.has(g.name)) visibilityByName.set(g.name, g.visible);
-    });
-    return visibilityByName;
-};
-
-export const shouldMeshBeVisible = (mesh, groupVisibilityMap = buildGroupVisibilityMap()) => {
+export const shouldMeshBeVisible = (mesh) => {
     const meshKey = getMeshKey(mesh);
     if (pendingDeletedExpressIDs.has(meshKey) || manuallyHiddenExpressIDs.has(meshKey)) return false;
     if (mesh.userData.sourceVisible === false) return false;
     if (filterFaultyBars.value && mesh.userData.isFaulty) return false;
     if (isRebarOnly.value && !mesh.userData.isRebar) return false;
-
-    let key = '';
-    if (groupCriterion.value === 'pos') key = mesh.userData.tag || (mesh.userData.isRebar ? 'Khác / Chưa đặt Pos' : 'Không có Tag/Pos');
-    else if (groupCriterion.value === 'name') key = mesh.userData.name || 'Chưa đặt tên (Unnamed)';
-    else if (groupCriterion.value === 'objectType') key = mesh.userData.objectType || 'Chưa có ObjectType';
-    else if (groupCriterion.value === 'entity') key = mesh.userData.type || 'IFCELEMENT';
-
-    if (groupVisibilityMap.get(key) === false) return false;
-
     return true;
 };
 
 export const updateAllMeshesVisibility = () => {
     requestRender();
-    const groupVisibilityMap = buildGroupVisibilityMap();
     rt.modelGroup.children.forEach(mesh => {
         if (mesh.isMesh) {
-            mesh.visible = shouldMeshBeVisible(mesh, groupVisibilityMap);
+            mesh.visible = shouldMeshBeVisible(mesh);
         }
     });
     updateEdgesVisibility();
@@ -295,11 +281,21 @@ export const updateAllMeshesVisibility = () => {
 
 export const updateEdgesVisibility = () => {
     requestRender();
-    if (showEdges.value && !isRebarOnly.value) ensureEdgesForVisibleMeshes();
+    syncGroupVisibility();
+    if (showEdges.value && !isRebarOnly.value) {
+        ensureEdgesForVisibleMeshes();
+        ensureIntersectionEdges();
+    }
     edgesGroup.visible = showEdges.value && !clashModeActive.value;
-    edgesGroup.children.forEach(line => {
-        const parentMesh = line.userData.parentMesh;
-        line.visible = showEdges.value && parentMesh && parentMesh.visible && !isRebarOnly.value;
+    edgesGroup.children.slice().forEach(line => {
+        const { parentMesh, pairMesh } = line.userData;
+        // Đường giao của cấu kiện đã bị gỡ khỏi model thì bỏ luôn
+        if (pairMesh && (!pairMesh.parent || !parentMesh?.parent)) {
+            line.geometry?.dispose();
+            edgesGroup.remove(line);
+            return;
+        }
+        line.visible = showEdges.value && parentMesh && parentMesh.visible && (!pairMesh || pairMesh.visible) && !isRebarOnly.value;
     });
     exportListVersion.value++;
 };
@@ -319,7 +315,7 @@ export const toggleSelectedVisibility = () => {
 export const queueSelectedForRemoval = () => {
     const selectedKeys = new Set(selectedMeshes.value.map(getMeshKey));
     if (selectedKeys.size === 0) {
-        showToast('Chưa chọn đối tượng', 'Chọn đối tượng trước khi đưa vào danh sách xóa.');
+        showToast(t('Chưa chọn đối tượng'), t('Chọn đối tượng trước khi đưa vào danh sách xóa.'));
         return;
     }
     const itemsById = new Map();
@@ -331,7 +327,7 @@ export const queueSelectedForRemoval = () => {
                 expressID: mesh.userData.expressID,
                 name: mesh.userData.name,
                 type: mesh.userData.type,
-                fileName: mesh.userData.sourceFileName || 'Mô hình mẫu',
+                fileName: mesh.userData.sourceFileName || t('Mô hình mẫu'),
                 sourceId: mesh.userData.sourceId
             });
         }
@@ -345,7 +341,7 @@ export const queueSelectedForRemoval = () => {
     if (itemsById.size > 0) hasUnsavedChanges.value = true;
     updateAllMeshesVisibility();
     clearSelection();
-    showToast('Đã đánh dấu xóa', `${itemsById.size} cấu kiện sẽ bị xóa khi xuất IFC.`, 'success');
+    showToast(t('Đã đánh dấu xóa'), t('{0} cấu kiện sẽ bị xóa khi xuất IFC.', [itemsById.size]), 'success');
 };
 
 export const restoreRemovedItem = (key) => {

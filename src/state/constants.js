@@ -74,14 +74,16 @@ export const INTRO_PANEL_CONTENT = {
     features: [
         { icon: 'ph-cube-transparent', title: 'View 3D chuyên sâu', text: 'Xoay, soi, lọc và chọn từng cấu kiện với mô hình IFC thực tế.' },
         { icon: 'ph-intersect', title: 'CropBox chính xác', text: 'Kiểm tra lát cắt, điều chỉnh từng mặt và tập trung vào vùng quan tâm.' },
+        { icon: 'ph-identification-card', title: 'Thông tin dự án', text: 'Mở file IFC là panel phải hiện ngay thông tin dự án: header file, dự án, khu đất, tòa nhà, tầng, người và ứng dụng xuất IFC. Sửa trực tiếp rồi lưu thành file IFC mới.' },
         { icon: 'ph-pencil-simple-line', title: 'Chỉnh sửa Attributes', text: 'Cập nhật Name, ObjectType, Tag, Description và lưu thành IFC mới.' },
         { icon: 'ph-stack', title: 'Combine nhiều file IFC', text: 'Gộp, quản lý và xuất nhiều mô hình trong cùng một view 3D.' },
+        { icon: 'ph-ruler', title: 'Đo đạc khoảng cách', text: 'Bấm D để đo: click 2 điểm trên model để có đường đo và nhãn cm/m. Tự bắt điểm vào cạnh, góc giao, vuông góc với cạnh hoặc bề mặt (7px), có xem trước khi di chuột. Danh sách phép đo ở tab Đo đạc.' },
         { icon: 'ph-intersect-three', title: 'Kiểm tra xung đột (Clash)', text: 'Tìm va chạm giữa các cấu kiện thép, dầm, cột và sàn ngay trong trình duyệt. Bấm một cặp clash để zoom tới vị trí, khối được chọn sẽ được tô nổi bật kèm nhãn chỉ vị trí.', wide: true }
     ],
     advantageTitle: 'Vượt trội hơn viewer thông thường',
-    advantageText: 'Có thể đánh dấu cấu kiện, quản lý Remove/Restore, phân nhóm, soi thép X-Ray, transport tọa độ và xuất lại file đã chỉnh sửa.',
+    advantageText: 'Có thể đánh dấu cấu kiện, quản lý Remove/Restore, phân nhóm, soi thép X-Ray, transport tọa độ, chia tách model theo phần đang hiển thị và xuất lại file đã chỉnh sửa.',
     roadmapTitle: 'Định hướng phát triển',
-    roadmapText: 'Nền tảng sẵn sàng mở rộng hệ thống đo đạt, thông tin khối lượng và các công cụ QC chuyên biệt.'
+    roadmapText: 'Nền tảng sẵn sàng mở rộng đo đạc nâng cao (bắt đỉnh, ghi dim vào IFC), thông tin khối lượng và các công cụ QC chuyên biệt.'
 };
 
 // --- VIEW CUBE: khối cubic chọn hướng nhìn (6 mặt, 12 cạnh, 8 góc) ---
@@ -91,20 +93,21 @@ export const VIEW_CUBE_BOX_PX = 120;
 // Hệ trục Three.js: X phải, Y lên (Top), Z hướng ra trước (Front).
 // right/down là hướng "phải"/"xuống" của chính mặt đó khi nhìn từ ngoài vào.
 const VIEW_CUBE_FACE_DEFS = [
-    { id: 'front', label: 'Front', normal: [0, 0, 1], right: [1, 0, 0], down: [0, -1, 0], rotate: '' },
-    { id: 'back', label: 'Back', normal: [0, 0, -1], right: [-1, 0, 0], down: [0, -1, 0], rotate: 'rotateY(180deg) ' },
-    { id: 'right', label: 'Right', normal: [1, 0, 0], right: [0, 0, -1], down: [0, -1, 0], rotate: 'rotateY(90deg) ' },
-    { id: 'left', label: 'Left', normal: [-1, 0, 0], right: [0, 0, 1], down: [0, -1, 0], rotate: 'rotateY(-90deg) ' },
-    { id: 'top', label: 'Top', normal: [0, 1, 0], right: [1, 0, 0], down: [0, 0, 1], rotate: 'rotateX(90deg) ' },
-    { id: 'bottom', label: 'Bottom', normal: [0, -1, 0], right: [1, 0, 0], down: [0, 0, -1], rotate: 'rotateX(-90deg) ' }
+    { id: 'front', label: 'Trước', normal: [0, 0, 1], right: [1, 0, 0], down: [0, -1, 0], rotate: '' },
+    { id: 'back', label: 'Sau', normal: [0, 0, -1], right: [-1, 0, 0], down: [0, -1, 0], rotate: 'rotateY(180deg) ' },
+    { id: 'right', label: 'Phải', normal: [1, 0, 0], right: [0, 0, -1], down: [0, -1, 0], rotate: 'rotateY(90deg) ' },
+    { id: 'left', label: 'Trái', normal: [-1, 0, 0], right: [0, 0, 1], down: [0, -1, 0], rotate: 'rotateY(-90deg) ' },
+    { id: 'top', label: 'Trên', normal: [0, 1, 0], right: [1, 0, 0], down: [0, 0, 1], rotate: 'rotateX(90deg) ' },
+    { id: 'bottom', label: 'Dưới', normal: [0, -1, 0], right: [1, 0, 0], down: [0, 0, -1], rotate: 'rotateX(-90deg) ' }
 ];
 
+// Trả về mảng tên hướng nhìn (khóa tiếng Việt) để giao diện tự dịch theo ngôn ngữ
 const describeViewDirection = (dir) => {
     const names = [];
-    if (dir[1]) names.push(dir[1] > 0 ? 'Top' : 'Bottom');
-    if (dir[2]) names.push(dir[2] > 0 ? 'Front' : 'Back');
-    if (dir[0]) names.push(dir[0] > 0 ? 'Right' : 'Left');
-    return names.join('-');
+    if (dir[1]) names.push(dir[1] > 0 ? 'Trên' : 'Dưới');
+    if (dir[2]) names.push(dir[2] > 0 ? 'Trước' : 'Sau');
+    if (dir[0]) names.push(dir[0] > 0 ? 'Phải' : 'Trái');
+    return names;
 };
 
 export const VIEW_CUBE_FACES = VIEW_CUBE_FACE_DEFS.map(def => {
@@ -118,7 +121,7 @@ export const VIEW_CUBE_FACES = VIEW_CUBE_FACE_DEFS.map(def => {
                 key: dir.join(','),
                 dir,
                 kind: nonZero === 0 ? 'vc-face-cell' : (nonZero === 1 ? 'vc-edge' : 'vc-corner'),
-                title: `Nhìn từ ${describeViewDirection(dir)}`
+                names: describeViewDirection(dir)
             });
         }
     }

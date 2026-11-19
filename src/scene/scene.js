@@ -3,13 +3,15 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { applyClashDisplayMode, updateClashAnnotationCamera } from '../clash/clash.js';
 import { requestRender } from '../core/helpers.js';
+import { initDimensionMarkers, updateDimensionScales } from '../dimension/dimension.js';
 import { init6FaceCropBox, updateCropHandleScales } from './cropbox.js';
 import { rebuildBatches, syncBatchVisibility } from './rendering.js';
 import { createSampleRebarModel } from './sample-model.js';
 import { onPointerDown, onPointerLeave, onPointerMove, onPointerUp } from '../selection/input.js';
-import { IDLE_RENDER_INTERVAL_MS, axisGizmoAxes, axisGizmoBackward, axisGizmoRight, axisGizmoUp, batchGroup, canvasContainer, clashAnnotationGroup, clashContextGroup, clashGroup, clashPairGroup, clashSelectionGroup, cropGroup, edgesGroup, isCropBoxActive, isLightBackground, isOrthographic, lightExposure, lightPreset, overlayGroup, rt, selectedMeshes, viewCubeEl, wasmReady } from '../state/state.js';
+import { IDLE_RENDER_INTERVAL_MS, axisGizmoAxes, backgroundThemeStorageKey, axisGizmoBackward, axisGizmoRight, axisGizmoUp, batchGroup, canvasContainer, clashAnnotationGroup, clashContextGroup, clashGroup, clashPairGroup, clashSelectionGroup, cropGroup, dimGroup, edgesGroup, isCropBoxActive, isLightBackground, isOrthographic, lightExposure, lightPreset, overlayGroup, rt, selectedMeshes, viewCubeEl, wasmReady } from '../state/state.js';
 import { VIEW_CUBE_BOX_PX, VIEW_CUBE_SIZE_PX } from '../state/constants.js';
 import { applyModelOpacityToScene, showToast } from '../ui/panels.js';
+import { t } from '../i18n/index.js';
 
 // --- 1. KHỞI TẠO WEB-IFC 0.0.66 ---
 export const initWebIFC = async () => {
@@ -20,7 +22,7 @@ export const initWebIFC = async () => {
         wasmReady.value = true;
     } catch (err) {
         console.error('Lỗi khởi tạo Web-IFC 0.0.66:', err);
-        showToast('Lỗi nạp thư viện', 'Không thể nạp thư viện WASM từ CDN.');
+        showToast(t('Lỗi nạp thư viện'), t('Không thể nạp thư viện WASM từ CDN.'));
     }
 };
 
@@ -84,6 +86,28 @@ export const updateAxisGizmo = () => {
         label.setAttribute('x', String(tipX + (screenX / projectedLength) * 7));
         label.setAttribute('y', String(tipY + (screenY / projectedLength) * 7));
     });
+};
+
+// OrbitControls luôn xoay quanh controls.target và tự gọi update() ngay trong sự kiện chuột. Khi click trúng mesh
+// (rt.orbitPivot), mỗi lần camera đổi hướng ta bù thêm một phép tịnh tiến để việc xoay tương đương xoay quanh điểm đó:
+// điểm đó đứng yên trên màn hình, view không bị giật.
+const pivotPreviousQuaternion = new THREE.Quaternion();
+const pivotRotation = new THREE.Quaternion();
+const pivotOffset = new THREE.Vector3();
+export const resetOrbitPivotTracking = () => pivotPreviousQuaternion.copy(rt.camera.quaternion);
+const compensateOrbitAroundPivot = () => {
+    const pivot = rt.orbitPivot;
+    if (pivot) {
+        // R: phép quay camera vừa được áp dụng quanh target
+        pivotRotation.copy(rt.camera.quaternion).multiply(pivotPreviousQuaternion.clone().invert());
+        pivotOffset.copy(pivot).sub(rt.controls.target);
+        pivotOffset.sub(pivotOffset.clone().applyQuaternion(pivotRotation));
+        if (pivotOffset.lengthSq() >= 1e-14) {
+            rt.camera.position.add(pivotOffset);
+            rt.controls.target.add(pivotOffset);
+        }
+    }
+    pivotPreviousQuaternion.copy(rt.camera.quaternion);
 };
 
 // --- 2. KHỞI TẠO THREE.JS (NỀN SÁNG, PERSPECTIVE/ORTHOGRAPHIC & CROPBOX ĐỘC LẬP 6 MẶT) ---
@@ -160,6 +184,8 @@ export const initThreeJS = () => {
 
     rt.gridHelper = new THREE.GridHelper(30, 30, 0x94a3b8, 0xcfd8dc);
     rt.scene.add(rt.gridHelper);
+    // Áp màu nền đã lưu trong trình duyệt (mặc định nền sáng)
+    setBackgroundTheme(isLightBackground.value);
 
     rt.scene.add(rt.transportGroup);
     rt.transportGroup.add(rt.modelGroup);
@@ -173,6 +199,8 @@ export const initThreeJS = () => {
     rt.scene.add(clashSelectionGroup);
     rt.scene.add(clashAnnotationGroup);
     rt.scene.add(clashPairGroup);
+    rt.scene.add(dimGroup);
+    initDimensionMarkers();
 
     // Khởi tạo CropBox 6 mặt độc lập kèm 6 mũi tên
     init6FaceCropBox();
@@ -188,6 +216,7 @@ export const initThreeJS = () => {
     domElem.addEventListener('pointercancel', onPointerUp);
     domElem.addEventListener('pointermove', onPointerMove);
     domElem.addEventListener('pointerleave', onPointerLeave);    rt.controls.addEventListener('change', requestRender);
+    rt.controls.addEventListener('change', compensateOrbitAroundPivot);
     window.addEventListener('resize', onWindowResize);
 
     // Render theo nhu cầu: chỉ vẽ khi camera/tương tác có thay đổi, còn lại refresh nền mỗi 200ms
@@ -200,6 +229,7 @@ export const initThreeJS = () => {
         rt.lastRenderTime = now;
         if (isCropBoxActive.value) updateCropHandleScales();
         if (clashAnnotationGroup.visible) updateClashAnnotationCamera();
+        if (dimGroup.visible) updateDimensionScales();
         updateAxisGizmo();
         syncBatchVisibility();
         rt.renderer.render(rt.scene, rt.camera);
@@ -210,6 +240,11 @@ export const initThreeJS = () => {
 // THIẾT LẬP MÀU NỀN VIEW 3D: SÁNG (LIGHT) HOẶC TỐI (DARK)
 export const setBackgroundTheme = (light) => {
     isLightBackground.value = light;
+    try {
+        localStorage.setItem(backgroundThemeStorageKey, String(light));
+    } catch (error) {
+        console.error('Không thể lưu cài đặt màu nền:', error);
+    }
     if (!rt.scene) return;
 
     if (light) {

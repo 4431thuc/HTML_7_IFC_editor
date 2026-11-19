@@ -4,6 +4,7 @@ import { refreshBatchMaterials } from './rendering.js';
 import { updateSelectionDimmingEffect } from '../selection/selection.js';
 import { edgeMaterial, edgesGroup, filterFaultyBars, hoverMaterial, isFlatShading, isRebarOnly, isWireframe, isXRayMode, materialCache, rt, selectMaterial, showEdges, showGrid } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
+import { t } from '../i18n/index.js';
 
 // TỐI ƯU HÓA HIỆU NĂNG: CHỈ TẠO VIỀN EDGES CHO CÁC KHỐI LỚN
 export const toggleEdges = () => {
@@ -19,7 +20,7 @@ export const recalculateAllNormals = () => {
             count++;
         }
     });
-    showToast('Đã tính lại Normals', `Đã chuẩn hóa pháp tuyến cho ${count} cấu kiện để khử tam giác đen.`, 'success');
+    showToast(t('Đã tính lại Normals'), t('Đã chuẩn hóa pháp tuyến cho {0} cấu kiện để khử tam giác đen.', [count]), 'success');
 };
 
 export const createEdgeOutline = (mesh, bufferGeo) => {

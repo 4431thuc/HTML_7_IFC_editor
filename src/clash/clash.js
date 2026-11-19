@@ -5,6 +5,7 @@ import { getMeshKey, requestRender } from '../core/helpers.js';
 import { refreshBatchMaterials } from '../scene/rendering.js';
 import { batchGroup, clashAnnotationGroup, clashBlueMaterial, clashBusy, clashContextGroup, clashContextMaterial, clashCount, clashError, clashGroup, clashItems, clashModeActive, clashOutlineMaterial, clashPairGroup, clashPairMaterialA, clashPairMaterialB, clashProgress, clashRedMaterial, clashSelectionGroup, clashToleranceMm, clashTypeA, clashTypeB, clashVolume, clashYellowMaterial, edgesGroup, isOrthographic, overlayGroup, pendingDeletedExpressIDs, rt, selectedClashId, selectionOutlineMaterial, showClashPairObjects, showEdges } from '../state/state.js';
 import { applyModelOpacityToScene, showToast } from '../ui/panels.js';
+import { t } from '../i18n/index.js';
 
 export const clearClashPairObjects = () => {
     while (clashPairGroup.children.length) {
@@ -283,12 +284,12 @@ export const runClashCheck = async () => {
         !pendingDeletedExpressIDs.has(getMeshKey(mesh))
     );
     if (candidates.length < 2) {
-        showToast('Chưa đủ cấu kiện', 'Cần ít nhất hai cấu kiện đang hiển thị để kiểm tra clash.');
+        showToast(t('Chưa đủ cấu kiện'), t('Cần ít nhất hai cấu kiện đang hiển thị để kiểm tra clash.'));
         return;
     }
     const toleranceMm = Number(clashToleranceMm.value);
     if (!Number.isFinite(toleranceMm) || toleranceMm < 0 || toleranceMm > 1000) {
-        clashError.value = 'Dung sai phải nằm trong khoảng từ 0 đến 1000 mm.';
+        clashError.value = t('Dung sai phải nằm trong khoảng từ 0 đến 1000 mm.');
         return;
     }
     const toleranceMeters = toleranceMm / 1000;
@@ -445,7 +446,7 @@ export const runClashCheck = async () => {
             applyModelOpacityToScene();
             applyClashDisplayMode();
             requestRender();
-            showToast('Đã hủy kiểm tra', 'Tiến trình kiểm tra clash đã được hủy.');
+            showToast(t('Đã hủy kiểm tra'), t('Tiến trình kiểm tra clash đã được hủy.'));
             return;
         }
 
@@ -474,16 +475,16 @@ export const runClashCheck = async () => {
         applyModelOpacityToScene();
         applyClashDisplayMode();
         requestRender();
-        showToast('Hoàn tất kiểm tra Clash', `Phát hiện ${found.length} cặp có vùng giao nhau.`, 'success');
+        showToast(t('Hoàn tất kiểm tra Clash'), t('Phát hiện {0} cặp có vùng giao nhau.', [found.length]), 'success');
     } catch (error) {
         console.error('Clash check failed:', error);
-        clashError.value = error?.message || 'Không thể hoàn tất kiểm tra clash.';
+        clashError.value = error?.message || t('Không thể hoàn tất kiểm tra clash.');
         clearClashGeometry();
         clashModeActive.value = false;
         refreshBatchMaterials();
         applyModelOpacityToScene();
         applyClashDisplayMode();
-        showToast('Lỗi kiểm tra Clash', clashError.value);
+        showToast(t('Lỗi kiểm tra Clash'), clashError.value);
     } finally {
         clashBusy.value = false;
         clashProgress.value = 0;

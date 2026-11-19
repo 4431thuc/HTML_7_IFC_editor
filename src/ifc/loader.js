@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { clearClashResults } from '../clash/clash.js';
 import { countLogicalObjects, createMeshKey, getMeshKey, getPsetCacheKey } from '../core/helpers.js';
-import { buildAllGroupingCollections, buildGroupVisibilityMap, indexAllPropertySets, shouldMeshBeVisible, updateAllMeshesVisibility, updateEdgesVisibility } from './groups.js';
+import { buildAllGroupingCollections, indexAllPropertySets, shouldMeshBeVisible, updateAllMeshesVisibility, updateEdgesVisibility } from './groups.js';
 import { getIfcLengthUnitInMeters, resetTransportState, updateTransportScene } from './transport.js';
 import { resetCropBoxToModel } from '../scene/cropbox.js';
 import { rebuildBatches } from '../scene/rendering.js';
@@ -12,6 +12,8 @@ import { ENTITY_DEFAULT_COLORS, REBAR_ENTITY_TYPES, parseDiameterMm } from '../s
 import { allGroups, batchGroup, clippingPlanes, deletedItems, edgesGroup, editHistoryCount, exportListVersion, faultyCount, fileName, hasLoadedIfc, hasUnsavedChanges, hoveredType, isCropBoxActive, isEditingAttributes, isIfcDragOver, isLoading, isSampleModel, isWireframe, loadingText, manuallyHiddenExpressIDs, materialCache, overlayGroup, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes, selectedObject, showEdges, sourceFiles, stats, toastMessage } from '../state/state.js';
 import { applyModelOpacityToMaterial, showToast } from '../ui/panels.js';
 import { showPropertiesForMesh } from '../ui/properties.js';
+import { removeProjectInfo, showProjectInfoForSource } from './project-info.js';
+import { t } from '../i18n/index.js';
 
 // --- 4. TẢI IFC VÀO SCENE DÙNG CHUNG ---
 export const handleFileUpload = async (event) => {
@@ -43,7 +45,7 @@ export const handleIfcDrop = async (event) => {
     const files = Array.from(event.dataTransfer?.files || []);
     if (files.length === 0) return;
     const ifcFiles = files.filter(file => file.name.toLowerCase().endsWith('.ifc'));
-    if (ifcFiles.length !== files.length) showToast('Bỏ qua tệp không hợp lệ', 'Chỉ nhận tệp có định dạng .ifc.');
+    if (ifcFiles.length !== files.length) showToast(t('Bỏ qua tệp không hợp lệ'), t('Chỉ nhận tệp có định dạng .ifc.'));
     for (let index = 0; index < ifcFiles.length; index++) {
         const replaceCurrent = index === 0 && isSampleModel.value;
         await loadIfcFile(ifcFiles[index], replaceCurrent);
@@ -52,13 +54,13 @@ export const handleIfcDrop = async (event) => {
 
 export const loadIfcFile = async (file, replaceCurrent) => {
     if (!file.name.toLowerCase().endsWith('.ifc')) {
-        showToast('Định dạng sai', `Vui lòng chọn tệp .ifc chuẩn: ${file.name}`);
+        showToast(t('Định dạng sai'), t('Vui lòng chọn tệp .ifc chuẩn: {0}', [file.name]));
         return false;
     }
 
     toastMessage.value = '';
     isLoading.value = true;
-    loadingText.value = `Đang đọc "${file.name}"...`;
+    loadingText.value = t('Đang đọc "{0}"...', [file.name]);
     if (replaceCurrent || !fileName.value) fileName.value = file.name;
     await new Promise(resolve => setTimeout(resolve, 60));
 
@@ -83,8 +85,8 @@ export const loadIfcFile = async (file, replaceCurrent) => {
         const uint8Array = new Uint8Array(await file.arrayBuffer());
         const schemaHeader = new TextDecoder('utf-8').decode(uint8Array.subarray(0, Math.min(uint8Array.length, 8192)));
         const schemaMatch = /FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i.exec(schemaHeader);
-        const schemaName = schemaMatch ? schemaMatch[1] : 'Không xác định';
-        loadingText.value = 'Cấu hình tham số hình học cốt thép...';
+        const schemaName = schemaMatch ? schemaMatch[1] : t('Không xác định');
+        loadingText.value = t('Cấu hình tham số hình học cốt thép...');
         await new Promise(resolve => setTimeout(resolve, 40));
 
         const modelSettings = {
@@ -95,15 +97,15 @@ export const loadIfcFile = async (file, replaceCurrent) => {
         };
 
         openedModelID = rt.ifcAPI.OpenModel(uint8Array, modelSettings);
-        if (openedModelID < 0) throw new Error(`Không thể mở model IFC "${file.name}".`);
+        if (openedModelID < 0) throw new Error(t('Không thể mở model IFC "{0}".', [file.name]));
         if (rt.currentModelID === null) rt.currentModelID = openedModelID;
         const unitMeters = getIfcLengthUnitInMeters(openedModelID);
 
-        loadingText.value = 'Lập chỉ mục quan hệ thuộc tính Psets...';
+        loadingText.value = t('Lập chỉ mục quan hệ thuộc tính Psets...');
         await new Promise(resolve => setTimeout(resolve, 30));
         indexAllPropertySets(openedModelID, sourceId);
 
-        loadingText.value = `Đang nạp hình học từ "${file.name}"...`;
+        loadingText.value = t('Đang nạp hình học từ "{0}"...', [file.name]);
         await new Promise(resolve => setTimeout(resolve, 30));
 
         let meshCount = 0;
@@ -188,7 +190,7 @@ export const loadIfcFile = async (file, replaceCurrent) => {
             }
         });
 
-        if (meshCount === 0) throw new Error(`Không tìm thấy hình học 3D trong file "${file.name}".`);
+        if (meshCount === 0) throw new Error(t('Không tìm thấy hình học 3D trong file "{0}".', [file.name]));
         rebuildBatches();
 
         sourceFiles.value.push({
@@ -219,7 +221,8 @@ export const loadIfcFile = async (file, replaceCurrent) => {
         showEdges.value = !(rebarRatio > 0.35 || stats.rebarCount > 600);
         updateEdgesVisibility();
         if (isCropBoxActive.value) resetCropBoxToModel();
-        showToast('Tải thành công', `Đã thêm "${file.name}": ${loadedObjectKeys.size} cấu kiện (${rebarCount} cốt thép).`, 'success');
+        showProjectInfoForSource(sourceFiles.value[sourceFiles.value.length - 1]);
+        showToast(t('Tải thành công'), t('Đã thêm "{0}": {1} cấu kiện ({2} cốt thép).', [file.name, loadedObjectKeys.size, rebarCount]), 'success');
         return true;
     } catch (error) {
         console.error(`Lỗi phân tích IFC "${file.name}":`, error);
@@ -242,7 +245,7 @@ export const loadIfcFile = async (file, replaceCurrent) => {
             catch (closeError) { console.warn('Không thể đóng model IFC lỗi:', closeError); }
         }
         if (rt.currentModelID === openedModelID) rt.currentModelID = sourceFiles.value[0]?.modelID ?? null;
-        showToast('Lỗi mở tệp', error.message || `Tệp "${file.name}" không hợp lệ.`);
+        showToast(t('Lỗi mở tệp'), error.message || t('Tệp "{0}" không hợp lệ.', [file.name]));
         return false;
     } finally {
         isLoading.value = false;
@@ -252,11 +255,10 @@ export const loadIfcFile = async (file, replaceCurrent) => {
 
 export const toggleSourceVisibility = (source) => {
     source.visible = !source.visible;
-    const groupVisibilityMap = buildGroupVisibilityMap();
     rt.modelGroup.children.forEach(mesh => {
         if (mesh.isMesh && mesh.userData.sourceId === source.id) {
             mesh.userData.sourceVisible = source.visible;
-            mesh.visible = shouldMeshBeVisible(mesh, groupVisibilityMap);
+            mesh.visible = shouldMeshBeVisible(mesh);
         }
     });
     updateEdgesVisibility();
@@ -302,6 +304,7 @@ export const removeSourceFile = (source) => {
         if (key.startsWith(sourceKeyPrefix)) psetCache.delete(key);
     });
 
+    removeProjectInfo(source.id);
     sourceFiles.value = sourceFiles.value.filter(item => item.id !== source.id);
     if (rt.currentModelID === source.modelID) rt.currentModelID = sourceFiles.value[0]?.modelID ?? null;
     try {
@@ -327,7 +330,7 @@ export const removeSourceFile = (source) => {
     updateSelectionDimmingEffect();
     fitCameraToModel();
     if (isCropBoxActive.value && stats.meshes > 0) resetCropBoxToModel();
-    showToast('Đã loại bỏ file', `Đã xóa "${source.name}" khỏi view và các danh sách.`, 'success');
+    showToast(t('Đã loại bỏ file'), t('Đã xóa "{0}" khỏi view và các danh sách.', [source.name]), 'success');
 };
 
 export const createThreeMeshFromIfc = (modelID, expressID, typeName, isRebar, placedGeometry, metaAttrs) => {
@@ -430,7 +433,7 @@ export const createThreeMeshFromIfc = (modelID, expressID, typeName, isRebar, pl
         type: typeName,
         schemaType: metaAttrs.schemaType || typeName,
         isRebar: isRebar,
-        name: metaAttrs.name || `Cấu kiện #${expressID}`,
+        name: metaAttrs.name || t('Cấu kiện #{0}', [expressID]),
         tag: metaAttrs.tag || '',
         objectType: metaAttrs.objectType || '',
         description: metaAttrs.description || '',

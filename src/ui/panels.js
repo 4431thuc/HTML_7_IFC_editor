@@ -1,5 +1,6 @@
 import { computed } from 'vue';
-import { boxEnd, boxStart, dontShowIntroAgain, edgeMaterial, hoverMaterial, introPanelStorageKey, leftPanelWidth, materialCache, modelOpacityBases, modelOpacityPercent, modelOpacityStorageKey, rightPanelWidth, rt, selectMaterial, selectedMeshes, showIntroPanel, showLeftPanel, showRightPanel, toastMessage, toastTitle, toastType, xrayMaterials } from '../state/state.js';
+import { boxEnd, boxStart, currentProjectInfo, dontShowIntroAgain, edgeMaterial, hoverMaterial, introPanelStorageKey, leftPanelWidth, materialCache, modelOpacityBases, modelOpacityPercent, modelOpacityStorageKey, rightPanelWidth, rt, selectMaterial, selectedMeshes, showIntroPanel, showLeftPanel, showRightPanel, toastMessage, toastTitle, toastType, xrayMaterials } from '../state/state.js';
+import { t } from '../i18n/index.js';
 
 export const playUiPop = (frequencyOrEvent = 620) => {
     const frequency = typeof frequencyOrEvent === 'number' ? frequencyOrEvent : 620;
@@ -34,7 +35,7 @@ export const closeIntroPanel = () => {
     }
 };
 export const togglePropertiesPanel = () => {
-    if (!showRightPanel.value && selectedMeshes.value.length === 0) return;
+    if (!showRightPanel.value && selectedMeshes.value.length === 0 && !currentProjectInfo.value) return;
     showRightPanel.value = !showRightPanel.value;
 };
 export const getPanelWidthLimit = (side) => {
@@ -119,7 +120,7 @@ export const persistModelOpacity = () => {
         localStorage.setItem(modelOpacityStorageKey, String(modelOpacityPercent.value));
     } catch (error) {
         console.error('Không thể lưu cài đặt độ mờ mô hình:', error);
-        showToast('Không lưu được cài đặt', 'Độ mờ đã áp dụng nhưng không thể lưu vào trình duyệt.');
+        showToast(t('Không lưu được cài đặt'), t('Độ mờ đã áp dụng nhưng không thể lưu vào trình duyệt.'));
     }
 };
 

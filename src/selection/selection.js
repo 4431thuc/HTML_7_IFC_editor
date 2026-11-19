@@ -7,6 +7,7 @@ import { fitCameraToSelectedObjects } from '../scene/scene.js';
 import { allGroups, clippingPlanes, groupCriterion, groupListContainer, groupSearchQuery, hoveredType, isCropBoxActive, isEditingAttributes, leftActiveTab, manuallyHiddenExpressIDs, pendingDeletedExpressIDs, rt, selectMaterial, selectedMeshes, selectedObject, selectionOutlineMaterial, selectionOutlines, showLeftPanel, showRightPanel } from '../state/state.js';
 import { applyModelOpacityToMaterial, playUiPop, showToast } from '../ui/panels.js';
 import { showPropertiesForMesh } from '../ui/properties.js';
+import { t } from '../i18n/index.js';
 
 // --- 7. HIGHLIGHT ĐỐI TƯỢNG VÀ KHUNG VIỀN VÙNG CHỌN ---
 
@@ -125,7 +126,7 @@ export const selectGroupMeshes = (grp) => {
 export const zoomToGroup = (grp) => {
     const visibleMeshes = grp.meshes.filter(mesh => mesh.visible && !isMeshPendingRemoval(mesh));
     if (visibleMeshes.length === 0) {
-        showToast('Không thể zoom', 'Nhóm này không có cấu kiện đang hiển thị.');
+        showToast(t('Không thể zoom'), t('Nhóm này không có cấu kiện đang hiển thị.'));
         return;
     }
     selectedMeshes.value = visibleMeshes.map(toRaw);
@@ -192,7 +193,7 @@ export const revealMeshInGroups = async (mesh) => {
     const rowMesh = group.objects.find(obj => getMeshKey(obj) === getMeshKey(rawMesh)) || rawMesh;
     if (!filteredGroups.value.includes(group)) {
         groupSearchQuery.value = '';
-        showToast('Danh sách nhóm', 'Đã xóa bộ lọc tìm kiếm để hiển thị cấu kiện được chọn.', 'success');
+        showToast(t('Danh sách nhóm'), t('Đã xóa bộ lọc tìm kiếm để hiển thị cấu kiện được chọn.'), 'success');
     }
     group.expanded = true;
     await nextTick();

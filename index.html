@@ -134,10 +134,10 @@
             </div>
             <div>
                 <h1 class="font-bold text-sm sm:text-base tracking-tight text-white flex items-center gap-2">
-                    IFC Rebar BIM Editor
+                    {{ t('IFC Rebar BIM Editor') }}
                 </h1>
                 <p class="text-[11px] text-slate-400 hidden sm:block truncate max-w-[260px]">
-                    {{ fileName || 'Chưa tải tệp mô hình (.ifc)' }}
+                    {{ fileName || t('Chưa tải tệp mô hình (.ifc)') }}
                 </p>
             </div>
         </div>
@@ -147,53 +147,60 @@
             <!-- Nút Mở file IFC -->
             <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition shadow-sm">
                 <i class="ph-bold ph-folder-open text-base"></i>
-                <span>Mở IFC</span>
+                <span>{{ t('Mở IFC') }}</span>
                 <input type="file" accept=".ifc" @change="handleFileUpload" class="hidden" :disabled="isLoading || !wasmReady">
             </label>
 
             <!-- Nút Lưu / Xuất IFC mới -->
             <button @click="exportModifiedIFC" :disabled="isLoading || !wasmReady || !hasUnsavedChanges"
                 class="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition shadow-sm"
-                title="Lưu lại toàn bộ thuộc tính đã chỉnh sửa thành file IFC mới">
+                :title="t('Lưu lại toàn bộ thuộc tính đã chỉnh sửa thành file IFC mới')">
                 <i class="ph-bold ph-floppy-disk text-base"></i>
-                <span class="hidden md:inline">Lưu file IFC</span>
+                <span class="hidden md:inline">{{ t('Lưu file IFC') }}</span>
                 <span v-if="editHistoryCount > 0" class="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-200 font-bold ml-0.5">{{ editHistoryCount }}</span>
             </button>
 
             <div class="h-6 w-[1px] bg-slate-800 mx-1 hidden sm:block"></div>
 
             <!-- NÚT CROP BOX (SECTION BOX) VỚI TAY CẦM MŨI TÊN 6 PHÍA -->
-            <button @click="toggleCropBox" title="Bật/Tắt Hộp cắt CropBox (Tay cầm mũi tên 6 mặt di chuyển từng phía độc lập)"
+            <button @click="toggleCropBox" :title="t('Bật/Tắt Hộp cắt CropBox (Tay cầm mũi tên 6 mặt di chuyển từng phía độc lập)')"
                 :class="isCropBoxActive ? 'bg-cyan-600 text-white border-cyan-400 ring-2 ring-cyan-500/30' : 'bg-slate-800 border-slate-700/50 text-slate-300 hover:bg-slate-700'"
                 class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition border shadow-sm">
                 <i class="ph-bold ph-scissors text-base text-cyan-300"></i>
-                <span class="hidden lg:inline">[C]ropBox</span>
+                <span class="hidden lg:inline">{{ t('[C]ropBox') }}</span>
             </button>
 
-            <!-- Nút Viền đen mỏng (Edge Outline) -->
-            <button @click="toggleEdges" title="Bật/Tắt viền đen mỏng quanh mép cấu kiện (Edges)"
-                :class="showEdges ? 'bg-amber-600/30 border-amber-500 text-amber-300' : 'bg-slate-800 border-slate-700/50 text-slate-300 hover:bg-slate-700'"
+            <!-- Nút bật/tắt chế độ đo đạc (phím D) -->
+            <button @click="toggleDimensionMode" :title="t('Bật/Tắt chế độ đo khoảng cách (phím D)')"
+                :class="dimModeActive ? 'bg-red-600/30 border-red-500 text-red-300' : 'bg-slate-800 border-slate-700/50 text-slate-300 hover:bg-slate-700'"
                 class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition border">
-                <i class="ph-bold ph-square text-base"></i>
-                <span class="hidden lg:inline">Viền mép</span>
+                <i class="ph-bold ph-ruler text-base"></i>
+                <span class="hidden lg:inline">{{ t('[D]Measure') }}</span>
             </button>
 
             <!-- Nút Căn giữa (Fit to View): TỰ ĐỘNG ZOOM VÀO ĐỐI TƯỢNG ĐANG CHỌN -->
-            <button @click="fitCameraToTarget" :title="selectedMeshes.length > 0 ? 'Zoom căn giữa đối tượng đang chọn' : 'Căn giữa toàn bộ mô hình'"
+            <button @click="fitCameraToTarget" :title="selectedMeshes.length > 0 ? t('Zoom căn giữa đối tượng đang chọn') : t('Căn giữa toàn bộ mô hình')"
                 class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium flex items-center gap-1.5 transition border border-slate-700/50">
                 <i class="ph-bold ph-corners-out text-base text-blue-400"></i>
-                <span class="hidden lg:inline">{{ selectedMeshes.length > 0 ? 'Zoom Chọn' : 'Căn giữa' }}</span>
+                <span class="hidden lg:inline">{{ selectedMeshes.length > 0 ? t('Zoom Chọn') : t('Căn giữa') }}</span>
+            </button>
+
+            <!-- Nút chuyển ngôn ngữ [VI/EN] -->
+            <button @click="toggleLanguage" :title="t('Chuyển ngôn ngữ giao diện')" :aria-label="t('Chuyển ngôn ngữ giao diện')"
+                class="px-2 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700/50 text-[11px] font-bold flex items-center gap-1 transition">
+                <i class="ph-bold ph-translate text-base text-emerald-400"></i>
+                <span>[<span :class="lang === 'vi' ? 'text-emerald-400' : 'text-slate-500'">VI</span>/<span :class="lang === 'en' ? 'text-emerald-400' : 'text-slate-500'">EN</span>]</span>
             </button>
 
             <!-- Toggle Panel Trái -->
-            <button @click="showLeftPanel = !showLeftPanel" title="Bảng quản lý lớp cấu kiện & nhóm"
+            <button @click="showLeftPanel = !showLeftPanel" :title="t('Bảng quản lý lớp cấu kiện & nhóm')"
                 :class="showLeftPanel ? 'bg-blue-600/20 border-blue-500 text-blue-300' : 'bg-slate-800 border-slate-700/50 text-slate-300 hover:bg-slate-700'"
                 class="p-1.5 rounded-md text-[11px] font-medium transition border">
                 <i class="ph-bold ph-sidebar-simple text-base"></i>
             </button>
 
             <!-- Toggle Panel Phải -->
-            <button @click="togglePropertiesPanel" title="Bảng thuộc tính & chỉnh sửa"
+            <button @click="togglePropertiesPanel" :title="t('Bảng thuộc tính & chỉnh sửa')"
                 :class="showRightPanel ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-400'"
                 class="p-1.5 rounded-md border border-slate-700/50 hover:bg-slate-700 transition">
                 <i class="ph-bold ph-info text-base"></i>
@@ -213,46 +220,53 @@
                     :class="leftActiveTab === 'display' ? 'bg-slate-800 text-blue-400 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[10px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-sliders"></i>
-                    <span class="text-[#90EE90] font-bold">Display</span>
+                    <span class="text-[#90EE90] font-bold">{{ t('Hiển thị') }}</span>
                 </button>
                 <button @click="leftActiveTab = 'groups'" 
                     :class="leftActiveTab === 'groups' ? 'bg-slate-800 text-amber-400 border-b-2 border-amber-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[10px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-tree-structure"></i>
-                    <span class="text-[#90EE90] font-bold">Groups</span>
+                    <span class="text-[#90EE90] font-bold">{{ t('Nhóm') }}</span>
                 </button>
                 <button @click="leftActiveTab = 'remove'"
                     :class="leftActiveTab === 'remove' ? 'bg-slate-800 text-rose-400 border-b-2 border-rose-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[10px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-trash"></i>
-                    <span class="text-[#90EE90] font-bold">Remove</span>
+                    <span class="text-[#90EE90] font-bold">{{ t('Xóa') }}</span>
                     <span v-if="deletedItems.length" class="rounded-full bg-rose-900/70 px-1">{{ deletedItems.length }}</span>
                 </button>
                 <button @click="leftActiveTab = 'export'"
                     :class="leftActiveTab === 'export' ? 'bg-slate-800 text-emerald-400 border-b-2 border-emerald-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[9px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
-                    <i class="ph-bold ph-export"></i>
-                    <span class="text-[#90EE90] font-bold">Export</span>
+                    <i class="ph-bold ph-scissors"></i>
+                    <span class="text-[#90EE90] font-bold">{{ t('Chia tách') }}</span>
                 </button>
                 <button @click="leftActiveTab = 'combine'"
                     :class="leftActiveTab === 'combine' ? 'bg-slate-800 text-cyan-400 border-b-2 border-cyan-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[9px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-files"></i>
-                    <span class="text-[#90EE90] font-bold">Combine</span>
+                    <span class="text-[#90EE90] font-bold">{{ t('Gộp') }}</span>
                     <span v-if="sourceFiles.length" class="rounded-full bg-cyan-900/70 px-1 text-cyan-200">{{ sourceFiles.length }}</span>
                 </button>
                 <button @click="leftActiveTab = 'transport'"
                     :class="leftActiveTab === 'transport' ? 'bg-slate-800 text-sky-400 border-b-2 border-sky-500' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[8px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-arrows-out-cardinal"></i>
-                    <span class="text-[#90EE90] font-bold">Transport</span>
+                    <span class="text-[#90EE90] font-bold">{{ t('Dịch chuyển') }}</span>
                 </button>
                 <button @click="leftActiveTab = 'clash'"
                     :class="leftActiveTab === 'clash' ? 'bg-slate-800 text-blue-300 border-b-2 border-blue-400' : 'text-slate-400 hover:text-slate-200'"
                     class="py-2 text-[8px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
                     <i class="ph-bold ph-intersect-three"></i>
-                    <span class="text-[#90EE90] font-bold">Clash</span>
+                    <span class="text-[#90EE90] font-bold">{{ t('Va chạm') }}</span>
                     <span v-if="clashCount" class="rounded-full bg-blue-900/70 px-1 text-blue-200">{{ clashCount }}</span>
+                </button>
+                <button @click="leftActiveTab = 'dimension'"
+                    :class="leftActiveTab === 'dimension' ? 'bg-slate-800 text-red-400 border-b-2 border-red-500' : 'text-slate-400 hover:text-slate-200'"
+                    class="py-2 text-[8px] font-semibold flex items-center justify-center gap-1 transition rounded-t">
+                    <i class="ph-bold ph-ruler"></i>
+                    <span class="text-[#90EE90] font-bold">{{ t('Đo đạc') }}</span>
+                    <span v-if="dimItems.length" class="rounded-full bg-red-900/70 px-1 text-red-200">{{ dimItems.length }}</span>
                 </button>
             </div>
 
@@ -262,7 +276,7 @@
                 <!-- 1.1 Chế độ xem cốt thép -->
                 <div>
                     <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <i class="ph-bold ph-cylinder text-amber-400"></i> Chế độ xem cốt thép
+                        <i class="ph-bold ph-cylinder text-amber-400"></i> {{ t('Chế độ xem cốt thép') }}
                     </h3>
                     <div class="space-y-2">
                         <button @click="toggleRebarOnly" 
@@ -270,11 +284,11 @@
                             class="w-full p-2.5 rounded-xl border flex items-center justify-between text-xs transition font-medium">
                             <div class="flex items-center gap-2">
                                 <i class="ph-bold ph-bounding-box text-base text-amber-400"></i>
-                                <span>Chỉ xem thép (Rebar Only)</span>
+                                <span>{{ t('Chỉ xem thép (Rebar Only)') }}</span>
                             </div>
                             <span class="text-[10px] font-bold px-2 py-0.5 rounded-full"
                                 :class="isRebarOnly ? 'bg-amber-700 text-white' : 'bg-slate-900 text-slate-400'">
-                                {{ isRebarOnly ? 'BẬT' : 'TẮT' }}
+                                {{ isRebarOnly ? t('BẬT') : t('TẮT') }}
                             </span>
                         </button>
 
@@ -283,11 +297,11 @@
                             class="w-full p-2.5 rounded-xl border flex items-center justify-between text-xs transition font-medium">
                             <div class="flex items-center gap-2">
                                 <i class="ph-bold ph-scan text-base text-cyan-400"></i>
-                                <span>Soi thép X-Ray (Làm mờ bê tông)</span>
+                                <span>{{ t('Soi thép X-Ray (Làm mờ bê tông)') }}</span>
                             </div>
                             <span class="text-[10px] font-bold px-2 py-0.5 rounded-full"
                                 :class="isXRayMode ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-900 text-slate-400'">
-                                Phím X [{{ isXRayMode ? 'ON' : 'OFF' }}]
+                                {{ t('Phím X [{0}]', [isXRayMode ? t('BẬT') : t('TẮT')]) }}
                             </span>
                         </button>
 
@@ -296,15 +310,15 @@
                             class="w-full p-2.5 rounded-xl border flex items-center justify-between text-xs transition font-medium">
                             <div class="flex items-center gap-2">
                                 <i class="ph-bold ph-funnel-simple text-base text-rose-400"></i>
-                                <span>Ẩn thanh lỗi kích thước</span>
+                                <span>{{ t('Ẩn thanh lỗi kích thước') }}</span>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <span v-if="faultyCount > 0" class="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/30 text-rose-300 font-bold">
-                                    {{ faultyCount }} lỗi
+                                    {{ t('{0} lỗi', [faultyCount]) }}
                                 </span>
                                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full"
                                     :class="filterFaultyBars ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'">
-                                    {{ filterFaultyBars ? 'Đang ẩn' : 'TẮT' }}
+                                    {{ filterFaultyBars ? t('Đang ẩn') : t('TẮT') }}
                                 </span>
                             </div>
                         </button>
@@ -314,7 +328,7 @@
                 <!-- 1.2 HỘP CẮT CROPBOX (MŨI TÊN 6 PHÍA ĐỘC LẬP) -->
                 <div>
                     <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <i class="ph-bold ph-scissors text-cyan-400"></i> Hộp cắt CropBox (Section Box)
+                        <i class="ph-bold ph-scissors text-cyan-400"></i> {{ t('Hộp cắt CropBox (Section Box)') }}
                     </h3>
                     <div class="space-y-2 bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-xs">
                         <button @click="toggleCropBox" 
@@ -322,11 +336,11 @@
                             class="w-full p-2 rounded-lg font-medium flex items-center justify-between transition">
                             <span class="flex items-center gap-1.5">
                                 <i class="ph-bold ph-cube text-cyan-300"></i>
-                                <span>Kích hoạt CropBox</span>
+                                <span>{{ t('Kích hoạt CropBox') }}</span>
                             </span>
                             <span class="text-[10px] font-bold px-2 py-0.5 rounded"
                                 :class="isCropBoxActive ? 'bg-cyan-700 text-white' : 'bg-slate-900 text-slate-400'">
-                                {{ isCropBoxActive ? 'ĐANG BẬT' : 'TẮT' }}
+                                {{ isCropBoxActive ? t('ĐANG BẬT') : t('TẮT') }}
                             </span>
                         </button>
 
@@ -335,25 +349,24 @@
                                 :aria-pressed="showOutsideCropEdges"
                                 :class="showOutsideCropEdges ? 'bg-cyan-600/30 border-cyan-400 text-cyan-200' : 'bg-slate-800 border-slate-700 text-slate-300'"
                                 class="w-full p-2 rounded-lg border flex items-center justify-between transition">
-                                <span>Hiện viền ngoài CropBox</span>
-                                <span class="text-[10px] font-bold">{{ showOutsideCropEdges ? 'BẬT' : 'TẮT' }}</span>
+                                <span>{{ t('Hiện viền ngoài CropBox') }}</span>
+                                <span class="text-[10px] font-bold">{{ showOutsideCropEdges ? t('BẬT') : t('TẮT') }}</span>
                             </button>
                             <button @click="cropToSelectedObjects" 
                                 class="w-full p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 flex items-center justify-center gap-1.5 font-medium transition"
-                                title="Thu nhỏ CropBox ôm sát nhóm đối tượng đang chọn">
+                                :title="t('Thu nhỏ CropBox ôm sát nhóm đối tượng đang chọn')">
                                 <i class="ph-bold ph-corners-in"></i>
-                                <span>Crop quanh đối tượng chọn</span>
+                                <span>{{ t('Crop quanh đối tượng chọn') }}</span>
                             </button>
 
                             <button @click="resetCropBoxToModel" 
                                 class="w-full p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center justify-center gap-1.5 font-medium transition">
                                 <i class="ph-bold ph-arrow-counter-clockwise"></i>
-                                <span>Reset CropBox toàn mô hình</span>
+                                <span>{{ t('Reset CropBox toàn mô hình') }}</span>
                             </button>
 
-                            <p class="text-[10px] text-cyan-300/80 leading-relaxed bg-cyan-950/40 p-2 rounded border border-cyan-800/40">
-                                <i class="ph-bold ph-info"></i> Nhấp trực tiếp vào 1 trong <strong>6 mũi tên</strong> trên bề mặt của hộp để kéo mặt đó độc lập (mặt đối diện giữ nguyên vị trí).
-                            </p>
+                            <p class="text-[10px] text-cyan-300/80 leading-relaxed bg-cyan-950/40 p-2 rounded border border-cyan-800/40"
+                                v-html="'<i class=\'ph-bold ph-info\'></i> ' + t('Nhấp trực tiếp vào 1 trong <strong>6 mũi tên</strong> trên bề mặt của hộp để kéo mặt đó độc lập (mặt đối diện giữ nguyên vị trí).')"></p>
                         </div>
                     </div>
                 </div>
@@ -361,38 +374,38 @@
                 <!-- 1.3 Môi trường, Hình chiếu & Màu nền -->
                 <div>
                     <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <i class="ph-bold ph-desktop text-blue-400"></i> Không gian & Góc chiếu
+                        <i class="ph-bold ph-desktop text-blue-400"></i> {{ t('Không gian & Góc chiếu') }}
                     </h3>
                     <div class="space-y-2 text-xs">
                         <!-- Chuyển đổi Perspective / Orthographic -->
                         <div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950/60">
                             <div>
-                                <span class="font-medium text-slate-200 block">Chế độ góc chiếu (Camera)</span>
-                                <span class="text-[10px] text-slate-400">{{ isOrthographic ? 'Trực giao không biến dạng (Orthographic)' : 'Phối cảnh chiều sâu (Perspective)' }}</span>
+                                <span class="font-medium text-slate-200 block">{{ t('Chế độ góc chiếu (Camera)') }}</span>
+                                <span class="text-[10px] text-slate-400">{{ isOrthographic ? t('Trực giao không biến dạng (Orthographic)') : t('Phối cảnh chiều sâu (Perspective)') }}</span>
                             </div>
                             <button @click="toggleCameraProjection"
                                 class="px-2.5 py-1 rounded-lg text-xs font-semibold border transition"
                                 :class="isOrthographic ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-slate-300 border-slate-700'">
-                                {{ isOrthographic ? 'Ortho' : 'Persp' }}
+                                {{ isOrthographic ? t('Trực giao') : t('Phối cảnh') }}
                             </button>
                         </div>
 
                         <!-- Chọn màu nền View 3D: Sáng (Light) / Tối (Dark) -->
                         <div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950/60">
                             <div>
-                                <span class="font-medium text-slate-200 block">Màu nền View 3D</span>
-                                <span class="text-[10px] text-slate-400">{{ isLightBackground ? 'Nền sáng chuẩn kỹ thuật (Slate 100)' : 'Nền tối dịu mắt (Slate 900)' }}</span>
+                                <span class="font-medium text-slate-200 block">{{ t('Màu nền View 3D') }}</span>
+                                <span class="text-[10px] text-slate-400">{{ isLightBackground ? t('Nền sáng chuẩn kỹ thuật (Slate 100)') : t('Nền tối dịu mắt (Slate 900)') }}</span>
                             </div>
                             <div class="flex gap-1">
                                 <button @click="setBackgroundTheme(true)"
                                     :class="isLightBackground ? 'bg-blue-600 text-white font-bold' : 'bg-slate-800 text-slate-400'"
                                     class="px-2 py-1 rounded text-[11px] transition">
-                                    Sáng
+                                    {{ t('Sáng') }}
                                 </button>
                                 <button @click="setBackgroundTheme(false)"
                                     :class="!isLightBackground ? 'bg-blue-600 text-white font-bold' : 'bg-slate-800 text-slate-400'"
                                     class="px-2 py-1 rounded text-[11px] transition">
-                                    Tối
+                                    {{ t('Tối') }}
                                 </button>
                             </div>
                         </div>
@@ -403,16 +416,16 @@
                                 :class="showEdges ? 'bg-amber-600/30 border-amber-400 text-amber-200' : 'bg-slate-800/80 border-slate-700/60 text-slate-300'"
                                 class="p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition">
                                 <i class="ph-bold ph-bounding-box text-lg text-amber-400"></i>
-                                <span class="font-medium">Viền đen mỏng</span>
-                                <span class="text-[10px] text-slate-500">{{ showEdges ? 'BẬT' : 'TẮT' }}</span>
+                                <span class="font-medium">{{ t('Viền đen mỏng') }}</span>
+                                <span class="text-[10px] text-slate-500">{{ showEdges ? t('BẬT') : t('TẮT') }}</span>
                             </button>
 
                             <button @click="toggleGrid" 
                                 :class="showGrid ? 'bg-blue-600/30 border-blue-400 text-blue-300' : 'bg-slate-800/80 border-slate-700/60 text-slate-300'"
                                 class="p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition">
                                 <i class="ph-bold ph-grid-four text-lg text-blue-400"></i>
-                                <span class="font-medium">Lưới mặt sàn</span>
-                                <span class="text-[10px] text-slate-500">{{ showGrid ? 'BẬT' : 'TẮT' }}</span>
+                                <span class="font-medium">{{ t('Lưới mặt sàn') }}</span>
+                                <span class="text-[10px] text-slate-500">{{ showGrid ? t('BẬT') : t('TẮT') }}</span>
                             </button>
                         </div>
                     </div>
@@ -421,41 +434,41 @@
                 <!-- 1.4 Chiếu sáng kiến trúc & Tối ưu hóa file nặng -->
                 <div>
                     <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <i class="ph-bold ph-sun text-amber-400"></i> Chiếu sáng & Hiệu năng cao
+                        <i class="ph-bold ph-sun text-amber-400"></i> {{ t('Chiếu sáng & Hiệu năng cao') }}
                     </h3>
                     <div class="space-y-3 bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-xs">
                         <button @click="toggleFlatShading" :aria-pressed="isFlatShading"
                             :class="isFlatShading ? 'bg-emerald-600/30 border-emerald-400 text-emerald-200' : 'bg-slate-800 border-slate-700 text-slate-300'"
                             class="w-full p-2 rounded-lg border flex items-center justify-between transition"
-                            title="Dùng vật liệu không tính ánh sáng để giảm tải GPU">
-                            <span>Bề mặt đơn giản (giảm tải)</span>
-                            <span>{{ isFlatShading ? 'BẬT' : 'TẮT' }}</span>
+                            :title="t('Dùng vật liệu không tính ánh sáng để giảm tải GPU')">
+                            <span>{{ t('Bề mặt đơn giản (giảm tải)') }}</span>
+                            <span>{{ isFlatShading ? t('BẬT') : t('TẮT') }}</span>
                         </button>
-                        <p class="text-[10px] text-slate-400">Bỏ hiệu ứng ánh sáng trên cấu kiện; màu sắc vẫn được giữ lại.</p>
+                        <p class="text-[10px] text-slate-400">{{ t('Bỏ hiệu ứng ánh sáng trên cấu kiện; màu sắc vẫn được giữ lại.') }}</p>
                         <div>
-                            <span class="text-[11px] text-slate-300 block mb-1">Góc chiếu đổ bóng:</span>
+                            <span class="text-[11px] text-slate-300 block mb-1">{{ t('Góc chiếu đổ bóng:') }}</span>
                             <div class="grid grid-cols-3 gap-1">
                                 <button @click="setLightAngle('morning')" 
                                     :class="lightPreset === 'morning' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300'"
                                     class="py-1 rounded text-[11px] font-medium transition text-center">
-                                    Sáng sớm
+                                    {{ t('Sáng sớm') }}
                                 </button>
                                 <button @click="setLightAngle('noon')" 
                                     :class="lightPreset === 'noon' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300'"
                                     class="py-1 rounded text-[11px] font-medium transition text-center">
-                                    Chính ngọ
+                                    {{ t('Chính ngọ') }}
                                 </button>
                                 <button @click="setLightAngle('isometric')" 
                                     :class="lightPreset === 'isometric' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300'"
                                     class="py-1 rounded text-[11px] font-medium transition text-center">
-                                    Vát 45°
+                                    {{ t('Vát 45°') }}
                                 </button>
                             </div>
                         </div>
 
                         <div>
                             <div class="flex justify-between text-slate-300 text-[11px] mb-1">
-                                <span>Cường độ sáng (Exposure)</span>
+                                <span>{{ t('Cường độ sáng (Exposure)') }}</span>
                                 <span class="font-mono text-blue-400">{{ lightExposure.toFixed(2) }}</span>
                             </div>
                             <input type="range" min="0.8" max="2.5" step="0.05" v-model.number="lightExposure" @input="updateLighting"
@@ -463,7 +476,7 @@
                         </div>
 
                         <div class="p-2 rounded-lg bg-emerald-950/40 border border-emerald-800/40 text-[10px] text-emerald-300">
-                            <i class="ph-bold ph-lightning"></i> <strong>Đã tối ưu hóa file nặng:</strong> Tắt bóng đổ thời gian thực, tái sử dụng vật liệu dùng chung & tự động bỏ qua viền nét với cấu kiện nhỏ để đạt 60 FPS mượt mà.
+                            <i class="ph-bold ph-lightning"></i> <span v-html="t('<strong>Đã tối ưu hóa file nặng:</strong> Tắt bóng đổ thời gian thực, tái sử dụng vật liệu dùng chung & tự động bỏ qua viền nét với cấu kiện nhỏ để đạt 60 FPS mượt mà.')"></span>
                         </div>
                     </div>
                 </div>
@@ -471,13 +484,13 @@
                 <!-- Thống kê tổng quan -->
                 <div class="p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-xs space-y-2 text-slate-400">
                     <div class="flex justify-between">
-                        <span>Đang chọn:</span>
-                        <strong class="text-amber-400 font-mono">{{ selectedMeshes.length }} đối tượng</strong>
+                        <span>{{ t('Đang chọn:') }}</span>
+                        <strong class="text-amber-400 font-mono">{{ t('{0} đối tượng', [selectedMeshes.length]) }}</strong>
                     </div>
                     <div class="pt-2 border-t border-slate-800/80 space-y-1 text-[11px]">
-                        <p class="text-slate-300 font-medium">Thao tác thông minh:</p>
-                        <p><strong class="text-amber-400">Viền chọn:</strong> Mỗi đối tượng được chọn có một viền nét đứt riêng, luôn hiển thị trên mô hình</p>
-                        <p><strong class="text-blue-400">Pan chuột giữa:</strong> Nhấn giữ chuột giữa rê để pan không trôi</p>
+                        <p class="text-slate-300 font-medium">{{ t('Thao tác thông minh:') }}</p>
+                        <p v-html="t('<strong class=\'text-amber-400\'>Viền chọn:</strong> Mỗi đối tượng được chọn có một viền nét đứt riêng, luôn hiển thị trên mô hình')"></p>
+                        <p v-html="t('<strong class=\'text-blue-400\'>Pan chuột giữa:</strong> Nhấn giữ chuột giữa rê để pan không trôi')"></p>
                     </div>
                 </div>
 
@@ -487,12 +500,12 @@
             <div v-show="leftActiveTab === 'groups'" class="flex-1 flex flex-col overflow-hidden">
                 <div class="p-3 border-b border-slate-800 bg-slate-950/40 space-y-2">
                     <div class="flex items-center justify-between">
-                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tiêu chí phân nhóm:</span>
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{{ t('Tiêu chí phân nhóm:') }}</span>
                         <div class="flex items-center gap-1.5 text-xs">
-                            <button @click="setAllActiveGroupsVisibility(true)" class="text-slate-400 hover:text-white" title="Hiện tất cả nhóm">
+                            <button @click="setAllActiveGroupsVisibility(true)" class="text-slate-400 hover:text-white" :title="t('Hiện tất cả nhóm')">
                                 <i class="ph-bold ph-eye"></i>
                             </button>
-                            <button @click="setAllActiveGroupsVisibility(false)" class="text-slate-400 hover:text-white" title="Ẩn tất cả nhóm">
+                            <button @click="setAllActiveGroupsVisibility(false)" class="text-slate-400 hover:text-white" :title="t('Ẩn tất cả nhóm')">
                                 <i class="ph-bold ph-eye-slash"></i>
                             </button>
                         </div>
@@ -502,28 +515,28 @@
                         <button @click="groupCriterion = 'pos'" 
                             :class="groupCriterion === 'pos' ? 'bg-amber-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
                             class="py-1 rounded transition text-center truncate">
-                            Pos Thép
+                            {{ t('Pos Thép') }}
                         </button>
                         <button @click="groupCriterion = 'name'" 
                             :class="groupCriterion === 'name' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
                             class="py-1 rounded transition text-center truncate">
-                            Tên (Name)
+                            {{ t('Tên (Name)') }}
                         </button>
                         <button @click="groupCriterion = 'objectType'" 
                             :class="groupCriterion === 'objectType' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
                             class="py-1 rounded transition text-center truncate">
-                            ObjType
+                            {{ t('ObjType') }}
                         </button>
                         <button @click="groupCriterion = 'entity'" 
                             :class="groupCriterion === 'entity' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
                             class="py-1 rounded transition text-center truncate">
-                            IFC Type
+                            {{ t('IFC Type') }}
                         </button>
                     </div>
 
                     <div class="relative">
                         <i class="ph-bold ph-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                        <input type="text" v-model="groupSearchQuery" placeholder="Tìm kiếm trong nhóm..." 
+                        <input type="text" v-model="groupSearchQuery" :placeholder="t('Tìm kiếm trong nhóm...')" 
                             class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500">
                     </div>
                 </div>
@@ -546,15 +559,15 @@
                                 <div class="w-3 h-3 rounded-full shrink-0 shadow-sm" :style="{ backgroundColor: grp.color }"></div>
                                 <div class="truncate">
                                     <div class="font-semibold text-slate-200 flex items-center gap-1 truncate" :title="grp.name">
-                                        <span class="truncate">{{ grp.name }}</span>
-                                        <span v-if="grp.isRebarGroup" class="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold shrink-0">Thép</span>
+                                        <span class="truncate">{{ t(grp.name) }}</span>
+                                        <span v-if="grp.isRebarGroup" class="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold shrink-0">{{ t('Thép') }}</span>
                                     </div>
-                                    <div class="text-[10px] text-slate-400 truncate">{{ grp.subText }}</div>
+                                    <div class="text-[10px] text-slate-400 truncate">{{ t(grp.subText) }}</div>
                                 </div>
                             </div>
 
                             <div class="flex items-center gap-2 shrink-0">
-                                <button @click.stop="selectGroupMeshes(grp)" title="Chọn toàn bộ cấu kiện nhóm này"
+                                <button @click.stop="selectGroupMeshes(grp)" :title="t('Chọn toàn bộ cấu kiện nhóm này')"
                                     class="p-1 rounded text-slate-400 hover:text-amber-400 hover:bg-slate-700/60 transition">
                                     <i class="ph-bold ph-check-square"></i>
                                 </button>
@@ -562,7 +575,7 @@
                                     {{ grp.count }}
                                 </span>
                                 <button @click.stop="toggleSingleGroupVisibility(grp)" 
-                                    :title="grp.visible ? 'Ẩn nhóm này' : 'Hiện nhóm này'"
+                                    :title="grp.visible ? t('Ẩn nhóm này') : t('Hiện nhóm này')"
                                     :class="grp.visible ? 'text-blue-400 hover:text-blue-300' : 'text-slate-500 hover:text-slate-300'"
                                     class="p-1 rounded hover:bg-slate-700/60 transition">
                                     <i :class="grp.visible ? 'ph-bold ph-eye' : 'ph-bold ph-eye-slash'" class="text-sm"></i>
@@ -583,9 +596,9 @@
                                 class="pl-8 pr-3 py-1.5 flex items-center justify-between text-[11px] cursor-pointer transition select-none">
                                 <div class="truncate flex items-center gap-1.5">
                                     <span class="font-mono text-[10px] text-slate-500">#{{ mesh.userData.expressID }}</span>
-                                    <span class="truncate">{{ mesh.userData.name || 'Unnamed' }}</span>
-                                    <span v-if="isMeshManuallyHidden(mesh)" class="shrink-0 rounded bg-slate-700 px-1 text-[9px] text-slate-400">Ẩn</span>
-                                    <span v-if="isMeshPendingRemoval(mesh)" class="shrink-0 rounded bg-rose-900/60 px-1 text-[9px] text-rose-300">Đã xóa</span>
+                                    <span class="truncate">{{ mesh.userData.name || t('Chưa đặt tên') }}</span>
+                                    <span v-if="isMeshManuallyHidden(mesh)" class="shrink-0 rounded bg-slate-700 px-1 text-[9px] text-slate-400">{{ t('Ẩn') }}</span>
+                                    <span v-if="isMeshPendingRemoval(mesh)" class="shrink-0 rounded bg-rose-900/60 px-1 text-[9px] text-rose-300">{{ t('Đã xóa') }}</span>
                                 </div>
                                 <span v-if="mesh.userData.sourceFileName" class="max-w-20 truncate text-[9px] text-slate-500" :title="mesh.userData.sourceFileName">{{ mesh.userData.sourceFileName }}</span>
                                 <span v-if="mesh.userData.tag" class="text-[10px] font-mono text-amber-400/80 shrink-0 ml-1">
@@ -596,83 +609,83 @@
                     </div>
 
                     <div v-if="filteredGroups.length === 0" class="p-6 text-center text-xs text-slate-500">
-                        Không có nhóm nào phù hợp.
+                        {{ t('Không có nhóm nào phù hợp.') }}
                     </div>
                 </div>
             </div>
 
             <div v-show="leftActiveTab === 'remove'" class="flex-1 flex flex-col overflow-hidden">
                 <div class="p-3 border-b border-slate-800 bg-slate-950/40 space-y-2">
-                    <p class="text-[11px] leading-relaxed text-slate-400">Chọn cấu kiện trên mô hình hoặc danh sách rồi nhấn Delete để đưa vào danh sách xóa.</p>
+                    <p class="text-[11px] leading-relaxed text-slate-400">{{ t('Chọn cấu kiện trên mô hình hoặc danh sách rồi nhấn Delete để đưa vào danh sách xóa.') }}</p>
                     <button @click="queueSelectedForRemoval" :disabled="selectedMeshes.length === 0"
                         class="w-full p-2 rounded-lg bg-rose-700 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold">
-                        Xóa đối tượng đang chọn (Delete)
+                        {{ t('Xóa đối tượng đang chọn (Delete)') }}
                     </button>
                 </div>
                 <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
                     <div v-for="item in deletedItems" :key="item.key"
                         class="flex items-center justify-between gap-2 p-2 rounded-lg border border-rose-900/50 bg-rose-950/20 text-xs">
                         <div class="min-w-0">
-                            <div class="truncate text-slate-200">{{ item.name || 'Unnamed' }}</div>
+                            <div class="truncate text-slate-200">{{ item.name || t('Chưa đặt tên') }}</div>
                             <div class="text-[10px] text-slate-500">#{{ item.expressID }} · {{ item.type }} · {{ item.fileName }}</div>
                         </div>
-                        <button @click="restoreRemovedItem(item.key)" title="Hoàn tác xóa"
+                        <button @click="restoreRemovedItem(item.key)" :title="t('Hoàn tác xóa')"
                             class="shrink-0 p-1 text-slate-400 hover:text-emerald-400"><i class="ph-bold ph-arrow-counter-clockwise"></i></button>
                     </div>
-                    <p v-if="deletedItems.length === 0" class="p-5 text-center text-xs text-slate-500">Chưa có đối tượng nào được đánh dấu xóa.</p>
+                    <p v-if="deletedItems.length === 0" class="p-5 text-center text-xs text-slate-500">{{ t('Chưa có đối tượng nào được đánh dấu xóa.') }}</p>
                 </div>
             </div>
 
             <div v-show="leftActiveTab === 'export'" class="flex-1 flex flex-col overflow-hidden">
                 <div class="p-3 border-b border-slate-800 bg-slate-950/40 space-y-2">
-                    <p class="text-[11px] leading-relaxed text-slate-400">Xuất IFC mới chỉ gồm các cấu kiện hiện đang hiển thị trên view.</p>
+                    <p class="text-[11px] leading-relaxed text-slate-400">{{ t('Chia tách: xuất IFC mới chỉ gồm các cấu kiện hiện đang hiển thị trên view.') }}</p>
                     <button @click="exportVisibleIFC" :disabled="isLoading || !wasmReady || isSampleModel || visibleExportItems.length === 0"
                         class="w-full p-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center justify-center gap-1.5">
-                        <i class="ph-bold ph-export"></i> Export {{ visibleExportItems.length }} đối tượng đang hiện
+                        <i class="ph-bold ph-export"></i> {{ t('Chia tách {0} đối tượng đang hiện', [visibleExportItems.length]) }}
                     </button>
                 </div>
                 <div class="flex-1 overflow-y-auto p-2 space-y-1">
                     <div v-for="item in visibleExportItems" :key="item.key"
                         class="p-2 rounded-lg border border-slate-800 bg-slate-800/30 text-xs">
-                        <div class="truncate text-slate-200">{{ item.name || 'Unnamed' }}</div>
+                        <div class="truncate text-slate-200">{{ item.name || t('Chưa đặt tên') }}</div>
                         <div class="text-[10px] text-slate-500">#{{ item.expressID }} · {{ item.type }} · {{ item.fileName }}</div>
                     </div>
-                    <p v-if="visibleExportItems.length === 0" class="p-5 text-center text-xs text-slate-500">Không có cấu kiện nào đang hiển thị.</p>
+                    <p v-if="visibleExportItems.length === 0" class="p-5 text-center text-xs text-slate-500">{{ t('Không có cấu kiện nào đang hiển thị.') }}</p>
                 </div>
             </div>
 
             <div v-show="leftActiveTab === 'combine'" class="flex-1 flex flex-col overflow-hidden">
                 <div class="p-3 border-b border-slate-800 bg-slate-950/40 space-y-2">
-                    <p class="text-[11px] leading-relaxed text-slate-400">Các file IFC được hiển thị chung trong view và danh sách Groups.</p>
+                    <p class="text-[11px] leading-relaxed text-slate-400">{{ t('Các file IFC được hiển thị chung trong view và danh sách Nhóm.') }}</p>
                     <label class="w-full p-2 rounded-lg bg-cyan-700 hover:bg-cyan-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
                         :class="isLoading || !wasmReady ? 'opacity-40 cursor-not-allowed' : ''">
-                        <i class="ph-bold ph-plus"></i> Add IFC
+                        <i class="ph-bold ph-plus"></i> {{ t('Thêm IFC') }}
                         <input type="file" accept=".ifc" multiple @change="handleAddIfcFiles" class="hidden" :disabled="isLoading || !wasmReady">
                     </label>
                     <button @click="exportCombineIFC" :disabled="isLoading || !wasmReady || sourceFiles.length === 0"
                         class="w-full p-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center justify-center gap-1.5">
-                        <i class="ph-bold ph-export"></i> Export Combine ({{ sourceFiles.length }} file)
+                        <i class="ph-bold ph-export"></i> {{ t('Xuất gộp ({0} file)', [sourceFiles.length]) }}
                     </button>
                 </div>
                 <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
                     <div v-for="source in sourceFiles" :key="source.id"
                         class="rounded-lg border border-slate-800 bg-slate-800/30 text-xs overflow-hidden">
                         <div class="flex items-center gap-1.5 p-2">
-                            <button @click="toggleSourceVisibility(source)" :title="source.visible ? 'Ẩn file trên view 3D' : 'Hiện file trên view 3D'"
+                            <button @click="toggleSourceVisibility(source)" :title="source.visible ? t('Ẩn file trên view 3D') : t('Hiện file trên view 3D')"
                                 :class="source.visible ? 'text-cyan-400 hover:text-cyan-300' : 'text-slate-500 hover:text-slate-300'"
                                 class="shrink-0 p-1 rounded hover:bg-slate-700/60">
                                 <i :class="source.visible ? 'ph-bold ph-eye' : 'ph-bold ph-eye-slash'"></i>
                             </button>
                             <div class="min-w-0 flex-1">
                                 <div class="truncate text-slate-200" :title="source.name">{{ source.name }}</div>
-                                <div class="text-[10px] text-cyan-300/80 truncate" :title="source.schemaName">Schema: {{ source.schemaName }} · {{ source.schemaRows.length }} loại</div>
-                                <div class="text-[10px] text-slate-500">{{ source.meshCount }} đối tượng · {{ source.rebarCount }} thép</div>
+                                <div class="text-[10px] text-cyan-300/80 truncate" :title="source.schemaName">{{ t('Schema: {0} · {1} loại', [source.schemaName, source.schemaRows.length]) }}</div>
+                                <div class="text-[10px] text-slate-500">{{ t('{0} đối tượng · {1} thép', [source.meshCount, source.rebarCount]) }}</div>
                             </div>
-                            <button @click.stop="source.schemaExpanded = !source.schemaExpanded" title="Xem cấu trúc schema"
+                            <button @click.stop="source.schemaExpanded = !source.schemaExpanded" :title="t('Xem cấu trúc schema')"
                                 class="shrink-0 p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-700/60">
                                 <i :class="source.schemaExpanded ? 'ph-bold ph-caret-down' : 'ph-bold ph-caret-right'"></i>
                             </button>
-                            <button @click.stop="removeSourceFile(source)" title="Loại bỏ file khỏi Combine"
+                            <button @click.stop="removeSourceFile(source)" :title="t('Loại bỏ file khỏi Combine')"
                                 class="shrink-0 p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-700/60">
                                 <i class="ph-bold ph-x"></i>
                             </button>
@@ -682,10 +695,10 @@
                                 <span class="truncate font-mono text-slate-400">{{ row.type }}</span>
                                 <span class="shrink-0 font-mono text-slate-300">{{ row.count }}</span>
                             </div>
-                            <p v-if="source.schemaRows.length === 0" class="text-[10px] text-slate-500">Không có entity 3D.</p>
+                            <p v-if="source.schemaRows.length === 0" class="text-[10px] text-slate-500">{{ t('Không có entity 3D.') }}</p>
                         </div>
                     </div>
-                    <p v-if="sourceFiles.length === 0" class="p-5 text-center text-xs text-slate-500">Chưa có file IFC nào được mở.</p>
+                    <p v-if="sourceFiles.length === 0" class="p-5 text-center text-xs text-slate-500">{{ t('Chưa có file IFC nào được mở.') }}</p>
                 </div>
             </div>
 
@@ -693,30 +706,30 @@
                 <div class="flex-1 overflow-y-auto p-3 space-y-3">
                     <section class="rounded-lg border border-slate-800 bg-slate-950/40 p-3 space-y-2.5">
                         <h3 class="text-[11px] font-bold text-sky-300 flex items-center gap-1.5">
-                            <i class="ph-bold ph-arrows-clockwise"></i> Rotate around IFC Z
+                            <i class="ph-bold ph-arrows-clockwise"></i> {{ t('Xoay quanh trục Z của IFC') }}
                         </h3>
                         <div class="grid grid-cols-3 gap-1.5">
-                            <input type="number" step="any" v-model.number="transportInputs.centerX" placeholder="CenterX (cm)" aria-label="Center X (cm)"
+                            <input type="number" step="any" v-model.number="transportInputs.centerX" :placeholder="t('Tâm X (cm)')" :aria-label="t('Tâm xoay X (cm)')"
                                 class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
-                            <input type="number" step="any" v-model.number="transportInputs.centerY" placeholder="CenterY (cm)" aria-label="Center Y (cm)"
+                            <input type="number" step="any" v-model.number="transportInputs.centerY" :placeholder="t('Tâm Y (cm)')" :aria-label="t('Tâm xoay Y (cm)')"
                                 class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
-                            <input type="number" step="any" v-model.number="transportInputs.centerZ" placeholder="CenterZ (cm)" aria-label="Center Z (cm)"
+                            <input type="number" step="any" v-model.number="transportInputs.centerZ" :placeholder="t('Tâm Z (cm)')" :aria-label="t('Tâm xoay Z (cm)')"
                                 class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
                         </div>
-                        <input type="number" step="any" v-model.number="transportInputs.angleDegrees" placeholder="Angle around Z (deg, clockwise)" aria-label="Angle around IFC Z axis (degrees, clockwise)"
+                        <input type="number" step="any" v-model.number="transportInputs.angleDegrees" :placeholder="t('Góc quay quanh Z (độ, theo chiều kim đồng hồ)')" :aria-label="t('Góc quay quanh trục Z của IFC (độ, theo chiều kim đồng hồ)')"
                             class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
                     </section>
 
                     <section class="rounded-lg border border-slate-800 bg-slate-950/40 p-3 space-y-2">
                         <h3 class="text-[11px] font-bold text-sky-300 flex items-center gap-1.5">
-                            <i class="ph-bold ph-arrows-out-line-horizontal"></i> Move Vector
+                            <i class="ph-bold ph-arrows-out-line-horizontal"></i> {{ t('Vector dịch chuyển') }}
                         </h3>
                         <div class="grid grid-cols-3 gap-1.5">
-                            <input type="number" step="any" v-model.number="transportInputs.vectorX" placeholder="VectorX (cm)" aria-label="Move X (cm)"
+                            <input type="number" step="any" v-model.number="transportInputs.vectorX" :placeholder="t('Vector X (cm)')" :aria-label="t('Dịch chuyển X (cm)')"
                                 class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
-                            <input type="number" step="any" v-model.number="transportInputs.vectorY" placeholder="VectorY (cm)" aria-label="Move Y (cm)"
+                            <input type="number" step="any" v-model.number="transportInputs.vectorY" :placeholder="t('Vector Y (cm)')" :aria-label="t('Dịch chuyển Y (cm)')"
                                 class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
-                            <input type="number" step="any" v-model.number="transportInputs.vectorZ" placeholder="VectorZ (cm)" aria-label="Move Z (cm)"
+                            <input type="number" step="any" v-model.number="transportInputs.vectorZ" :placeholder="t('Vector Z (cm)')" :aria-label="t('Dịch chuyển Z (cm)')"
                                 class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
                         </div>
                     </section>
@@ -724,25 +737,25 @@
                     <div class="grid grid-cols-2 gap-2">
                         <button @click="openTransportProfileDialog" :disabled="isLoading"
                             class="p-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white text-[11px] font-semibold flex flex-col items-center justify-center gap-1">
-                            <i class="ph-bold ph-floppy-disk text-base"></i> Save Profile
+                            <i class="ph-bold ph-floppy-disk text-base"></i> {{ t('Lưu profile') }}
                         </button>
                         <button @click="applyTransport" :disabled="isLoading || sourceFiles.length === 0"
                             class="p-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-[11px] font-semibold flex flex-col items-center justify-center gap-1">
-                            <i class="ph-bold ph-rocket-launch text-base"></i> Transport Model
+                            <i class="ph-bold ph-rocket-launch text-base"></i> {{ t('Dịch chuyển mô hình') }}
                         </button>
                     </div>
-                    <p class="text-[10px] leading-relaxed text-slate-500">Tâm xoay và vector dịch tính bằng cm theo tọa độ IFC. Góc dương xoay theo chiều kim đồng hồ quanh trục Y toàn cục.</p>
+                    <p class="text-[10px] leading-relaxed text-slate-500">{{ t('Tâm xoay và vector dịch tính bằng cm theo tọa độ IFC. Góc dương xoay theo chiều kim đồng hồ quanh trục Y toàn cục.') }}</p>
 
                     <div class="grid grid-cols-2 border-b border-slate-800">
                         <button @click="transportInnerTab = 'profiles'"
                             :class="transportInnerTab === 'profiles' ? 'text-emerald-300 border-b-2 border-emerald-400' : 'text-slate-500 hover:text-slate-300'"
                             class="py-2 text-[10px] font-semibold flex items-center justify-center gap-1.5">
-                            <i class="ph-bold ph-folder-open"></i> Save Profile
+                            <i class="ph-bold ph-folder-open"></i> {{ t('Profile đã lưu') }}
                         </button>
                         <button @click="transportInnerTab = 'history'"
                             :class="transportInnerTab === 'history' ? 'text-amber-300 border-b-2 border-amber-400' : 'text-slate-500 hover:text-slate-300'"
                             class="py-2 text-[10px] font-semibold flex items-center justify-center gap-1.5">
-                            <i class="ph-bold ph-clock-counter-clockwise"></i> History
+                            <i class="ph-bold ph-clock-counter-clockwise"></i> {{ t('Lịch sử') }}
                             <span v-if="transportHistory.length" class="rounded-full bg-slate-800 px-1">{{ transportHistory.length }}</span>
                         </button>
                     </div>
@@ -751,10 +764,10 @@
                         <div class="grid grid-cols-2 gap-2">
                             <button @click="exportTransportProfiles" :disabled="transportProfiles.length === 0"
                                 class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-[10px] font-semibold">
-                                <i class="ph-bold ph-download-simple"></i> Export JSON
+                                <i class="ph-bold ph-download-simple"></i> {{ t('Xuất JSON') }}
                             </button>
                             <label class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold text-center cursor-pointer">
-                                <i class="ph-bold ph-upload-simple"></i> Import JSON
+                                <i class="ph-bold ph-upload-simple"></i> {{ t('Nhập JSON') }}
                                 <input type="file" accept=".json,application/json" @change="importTransportProfiles" class="hidden">
                             </label>
                         </div>
@@ -762,14 +775,14 @@
                             class="flex items-center gap-2 p-2 rounded-lg border border-slate-800 bg-slate-950/30">
                             <div class="min-w-0 flex-1">
                                 <div class="truncate text-[11px] text-slate-200" :title="profile.name">{{ profile.name }}</div>
-                                <div class="text-[9px] text-slate-500">{{ profile.angleDegrees }}° · Δ {{ profile.vectorX }}, {{ profile.vectorY }}, {{ profile.vectorZ }} cm</div>
+                                <div class="text-[9px] text-slate-500">{{ t('{0}° · Δ {1}, {2}, {3} cm', [profile.angleDegrees, profile.vectorX, profile.vectorY, profile.vectorZ]) }}</div>
                             </div>
-                            <button @click="useTransportProfile(profile)" title="Use profile"
-                                class="shrink-0 rounded px-2 py-1 text-[10px] font-semibold text-cyan-300 hover:bg-slate-800">Use</button>
-                            <button @click="deleteTransportProfile(profile)" title="Xóa profile"
+                            <button @click="useTransportProfile(profile)" :title="t('Dùng profile')"
+                                class="shrink-0 rounded px-2 py-1 text-[10px] font-semibold text-cyan-300 hover:bg-slate-800">{{ t('Dùng') }}</button>
+                            <button @click="deleteTransportProfile(profile)" :title="t('Xóa profile')"
                                 class="shrink-0 p-1 text-slate-500 hover:text-rose-400"><i class="ph-bold ph-x"></i></button>
                         </div>
-                        <p v-if="transportProfiles.length === 0" class="py-5 text-center text-[10px] text-slate-500">Chưa có profile được lưu.</p>
+                        <p v-if="transportProfiles.length === 0" class="py-5 text-center text-[10px] text-slate-500">{{ t('Chưa có profile được lưu.') }}</p>
                     </div>
 
                     <div v-show="transportInnerTab === 'history'" class="space-y-2">
@@ -779,14 +792,14 @@
                                 <div class="min-w-0 flex-1">
                                     <div class="text-[10px] font-semibold text-slate-200">{{ entry.timestamp }}</div>
                                     <div class="truncate text-[9px] text-slate-500" :title="entry.files">{{ entry.files }}</div>
-                                    <div class="text-[9px] text-slate-400">Tâm {{ entry.centerX }}, {{ entry.centerY }}, {{ entry.centerZ }} cm · Góc {{ entry.angleDegrees }}°</div>
-                                    <div class="text-[9px] text-slate-400">Δ {{ entry.vectorX }}, {{ entry.vectorY }}, {{ entry.vectorZ }} cm</div>
+                                    <div class="text-[9px] text-slate-400">{{ t('Tâm {0}, {1}, {2} cm · Góc {3}°', [entry.centerX, entry.centerY, entry.centerZ, entry.angleDegrees]) }}</div>
+                                    <div class="text-[9px] text-slate-400">{{ t('Δ {0}, {1}, {2} cm', [entry.vectorX, entry.vectorY, entry.vectorZ]) }}</div>
                                 </div>
-                                <button @click="undoTransport(entry)" :disabled="index !== 0" title="Undo lần Transport này"
-                                    class="shrink-0 px-2 py-1 rounded text-[10px] font-semibold text-amber-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed">Undo</button>
+                                <button @click="undoTransport(entry)" :disabled="index !== 0" :title="t('Hoàn tác lần dịch chuyển này')"
+                                    class="shrink-0 px-2 py-1 rounded text-[10px] font-semibold text-amber-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed">{{ t('Hoàn tác') }}</button>
                             </div>
                         </div>
-                        <p v-if="transportHistory.length === 0" class="py-5 text-center text-[10px] text-slate-500">Chưa có lịch sử transport.</p>
+                        <p v-if="transportHistory.length === 0" class="py-5 text-center text-[10px] text-slate-500">{{ t('Chưa có lịch sử dịch chuyển.') }}</p>
                     </div>
                 </div>
             </div>
@@ -794,76 +807,109 @@
             <div v-show="leftActiveTab === 'clash'" class="flex-1 flex flex-col overflow-hidden">
                 <div class="p-3 border-b border-slate-800 bg-slate-950/40 space-y-3">
                     <div>
-                        <h3 class="text-xs font-bold text-blue-300 flex items-center gap-2"><i class="ph-bold ph-intersect-three"></i> Kiểm tra xung đột mô hình</h3>
-                        <p class="mt-1 text-[10px] leading-relaxed text-slate-400">Bấm một cặp clash để zoom. Khối được chọn sẽ nhấp nháy vàng/đỏ rồi giữ màu vàng, có viền nét đứt và nhãn chỉ vị trí.</p>
+                        <h3 class="text-xs font-bold text-blue-300 flex items-center gap-2"><i class="ph-bold ph-intersect-three"></i> {{ t('Kiểm tra xung đột mô hình') }}</h3>
+                        <p class="mt-1 text-[10px] leading-relaxed text-slate-400">{{ t('Bấm một cặp clash để zoom. Khối được chọn sẽ nhấp nháy vàng/đỏ rồi giữ màu vàng, có viền nét đứt và nhãn chỉ vị trí.') }}</p>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <label class="min-w-0 space-y-1">
-                            <span class="block text-[10px] font-semibold text-slate-400">Loại cấu kiện A</span>
+                            <span class="block text-[10px] font-semibold text-slate-400">{{ t('Loại cấu kiện A') }}</span>
                             <select v-model="clashTypeA" class="w-full min-w-0 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-[10px] text-slate-200 outline-none focus:border-blue-500">
-                                <option value="*">Tất cả loại</option>
+                                <option value="*">{{ t('Tất cả loại') }}</option>
                                 <option v-for="type in clashTypeOptions" :key="type.value" :value="type.value">{{ type.label }}</option>
                             </select>
                         </label>
                         <label class="min-w-0 space-y-1">
-                            <span class="block text-[10px] font-semibold text-slate-400">Loại cấu kiện B</span>
+                            <span class="block text-[10px] font-semibold text-slate-400">{{ t('Loại cấu kiện B') }}</span>
                             <select v-model="clashTypeB" class="w-full min-w-0 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-[10px] text-slate-200 outline-none focus:border-blue-500">
-                                <option value="*">Tất cả loại</option>
+                                <option value="*">{{ t('Tất cả loại') }}</option>
                                 <option v-for="type in clashTypeOptions" :key="type.value" :value="type.value">{{ type.label }}</option>
                             </select>
                         </label>
                     </div>
                     <label class="block space-y-1">
-                        <span class="flex items-center justify-between text-[10px] font-semibold text-slate-400"><span>Dung sai kiểm tra</span><span class="text-blue-300">mm</span></span>
+                        <span class="flex items-center justify-between text-[10px] font-semibold text-slate-400"><span>{{ t('Dung sai kiểm tra') }}</span><span class="text-blue-300">mm</span></span>
                         <input v-model.number="clashToleranceMm" type="number" min="0" max="1000" step="0.5"
                             class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs text-slate-100 outline-none focus:border-blue-500" />
-                        <span class="block text-[9px] leading-relaxed text-slate-500">0 = chỉ tìm phần giao thực tế. Dung sai lớn hơn 0 sẽ nới mỗi cấu kiện một nửa giá trị để phát hiện cả khe hở nhỏ.</span>
+                        <span class="block text-[9px] leading-relaxed text-slate-500">{{ t('0 = chỉ tìm phần giao thực tế. Dung sai lớn hơn 0 sẽ nới mỗi cấu kiện một nửa giá trị để phát hiện cả khe hở nhỏ.') }}</span>
                     </label>
                     <button @click="onClashButtonClick" :disabled="!clashBusy && (isLoading || stats.meshes < 2)"
-                        :title="clashBusy ? 'Bấm lần nữa để hủy kiểm tra' : ''"
+                        :title="clashBusy ? t('Bấm lần nữa để hủy kiểm tra') : ''"
                         class="relative w-full p-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center justify-center gap-2">
                         <svg v-if="clashBusy" class="pointer-events-none absolute inset-0 w-full h-full overflow-visible" aria-hidden="true">
                             <rect x="1.5" y="1.5" rx="8" pathLength="100" fill="none" stroke="#67e8f9" stroke-width="3"
                                 :style="{ width: 'calc(100% - 3px)', height: 'calc(100% - 3px)', strokeDasharray: `${clashProgress * 100} 100` }"></rect>
                         </svg>
-                        <i class="ph-bold ph-magnifying-glass"></i>{{ clashBusy ? `Đang kiểm tra ${Math.round(clashProgress * 100)}% · bấm để hủy` : 'Check Clash Model' }}
+                        <i class="ph-bold ph-magnifying-glass"></i>{{ clashBusy ? t('Đang kiểm tra {0}% · bấm để hủy', [Math.round(clashProgress * 100)]) : t('Kiểm tra va chạm mô hình') }}
                     </button>
                     <button @click="toggleClashPairObjects" :disabled="!selectedClashId"
                         :class="showClashPairObjects ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'"
                         class="w-full p-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-semibold flex items-center justify-center gap-2">
-                        <i class="ph-bold ph-eye"></i>{{ showClashPairObjects ? 'Ẩn 2 đối tượng clash' : 'Hiện 2 đối tượng clash' }}
+                        <i class="ph-bold ph-eye"></i>{{ showClashPairObjects ? t('Ẩn 2 đối tượng clash') : t('Hiện 2 đối tượng clash') }}
                     </button>
                     <button v-if="clashModeActive" @click="clearClashResults"
-                        class="w-full p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold">Tắt kết quả / Khôi phục mô hình</button>
+                        class="w-full p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold">{{ t('Tắt kết quả / Khôi phục mô hình') }}</button>
                     <div class="grid grid-cols-2 gap-2">
-                        <div class="rounded-lg border border-slate-800 bg-slate-900 p-2"><div class="text-[10px] text-slate-500">Cặp xung đột</div><div class="text-lg font-bold text-blue-300">{{ clashCount }}</div></div>
-                        <div class="rounded-lg border border-slate-800 bg-slate-900 p-2"><div class="text-[10px] text-slate-500">Thể tích giao nhau</div><div class="text-lg font-bold text-blue-300">{{ clashVolume.toFixed(4) }} m³</div></div>
+                        <div class="rounded-lg border border-slate-800 bg-slate-900 p-2"><div class="text-[10px] text-slate-500">{{ t('Cặp xung đột') }}</div><div class="text-lg font-bold text-blue-300">{{ clashCount }}</div></div>
+                        <div class="rounded-lg border border-slate-800 bg-slate-900 p-2"><div class="text-[10px] text-slate-500">{{ t('Thể tích giao nhau') }}</div><div class="text-lg font-bold text-blue-300">{{ clashVolume.toFixed(4) }} m³</div></div>
                     </div>
                     <div v-if="clashError" class="rounded-lg border border-rose-800/60 bg-rose-950/30 p-2 text-[10px] text-rose-300">{{ clashError }}</div>
                     <div v-if="clashModeActive" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-slate-300">
-                        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm border border-black bg-blue-500"></span> Khối clash</span>
-                        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm border border-slate-400"></span> Đường bao ngoài</span>
+                        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm border border-black bg-blue-500"></span> {{ t('Khối clash') }}</span>
+                        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm border border-slate-400"></span> {{ t('Đường bao ngoài') }}</span>
                     </div>
                 </div>
                 <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
-                    <div v-if="clashItems.length" class="px-1 pb-1 text-[9px] text-slate-500">Sắp xếp theo thể tích giao nhau: lớn nhất ở trên</div>
+                    <div v-if="clashItems.length" class="px-1 pb-1 text-[9px] text-slate-500">{{ t('Sắp xếp theo thể tích giao nhau: lớn nhất ở trên') }}</div>
                     <button v-for="(item, index) in clashItems" :key="item.id" @click="zoomToClash(item)"
                         :class="selectedClashId === item.id ? 'border-amber-400 bg-amber-950/40 ring-1 ring-amber-500/60' : 'border-slate-800 bg-slate-800/30 hover:border-blue-500/70 hover:bg-blue-950/30'"
                         class="w-full rounded-lg border p-2 text-left text-[10px] transition focus:outline-none focus:ring-1 focus:ring-amber-400">
-                        <div class="flex items-center justify-between gap-2"><span class="font-semibold" :class="selectedClashId === item.id ? 'text-amber-300' : 'text-blue-200'">Clash #{{ index + 1 }}</span><span class="text-slate-400">{{ item.volume.toFixed(6) }} m³</span></div>
+                        <div class="flex items-center justify-between gap-2"><span class="font-semibold" :class="selectedClashId === item.id ? 'text-amber-300' : 'text-blue-200'">{{ t('Va chạm #{0}', [index + 1]) }}</span><span class="text-slate-400">{{ item.volume.toFixed(6) }} m³</span></div>
                         <div class="mt-1 text-slate-300">{{ item.nameA }} <span class="text-blue-400">↔</span> {{ item.nameB }}</div>
-                        <div class="mt-1 text-[9px] text-slate-500">{{ item.typeA }} ↔ {{ item.typeB }} · Bấm để zoom vùng clash</div>
+                        <div class="mt-1 text-[9px] text-slate-500">{{ t('{0} ↔ {1} · Bấm để zoom vùng clash', [item.typeA, item.typeB]) }}</div>
                     </button>
-                    <p v-if="clashModeActive && clashCount === 0" class="p-5 text-center text-xs text-emerald-300">Không phát hiện vùng thể tích giao nhau theo điều kiện đã chọn.</p>
-                    <p v-if="!clashModeActive && !clashBusy" class="p-5 text-center text-xs text-slate-500">Chọn loại cấu kiện A/B, dung sai rồi nhấn Check Clash Model.</p>
+                    <p v-if="clashModeActive && clashCount === 0" class="p-5 text-center text-xs text-emerald-300">{{ t('Không phát hiện vùng thể tích giao nhau theo điều kiện đã chọn.') }}</p>
+                    <p v-if="!clashModeActive && !clashBusy" class="p-5 text-center text-xs text-slate-500">{{ t('Chọn loại cấu kiện A/B, dung sai rồi nhấn Kiểm tra va chạm mô hình.') }}</p>
                 </div>
             </div>
 
+            <!-- NỘI DUNG TAB: ĐO ĐẠC (DIMENSION) -->
+            <div v-show="leftActiveTab === 'dimension'" class="flex-1 flex flex-col overflow-hidden">
+                <div class="p-3 border-b border-slate-800 bg-slate-950/40 space-y-3">
+                    <div>
+                        <h3 class="text-xs font-bold text-red-300 flex items-center gap-2"><i class="ph-bold ph-ruler"></i> {{ t('Đo khoảng cách') }}</h3>
+                        <p class="mt-1 text-[10px] leading-relaxed text-slate-400">{{ t('Bấm phím D để bật/tắt chế độ đo. Click chuột trái để chọn điểm đo 1, click lần 2 để chọn điểm đo 2. Esc để hủy điểm đang chọn.') }}</p>
+                    </div>
+                    <button @click="toggleDimensionMode"
+                        :class="dimModeActive ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'"
+                        class="w-full p-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2">
+                        <i class="ph-bold ph-ruler"></i>{{ dimModeActive ? t('Đang đo · bấm để tắt [D]') : t('Bật chế độ đo [D]') }}
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+                    <div v-for="(item, index) in dimItems" :key="item.id" @click="zoomToDimension(item)"
+                        :class="selectedDimId === item.id ? 'border-amber-400 bg-amber-950/40 ring-1 ring-amber-500/60' : 'border-slate-800 bg-slate-800/30 hover:border-red-500/70 hover:bg-red-950/30'"
+                        class="w-full cursor-pointer rounded-lg border p-2 text-[10px] transition">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-semibold" :class="selectedDimId === item.id ? 'text-amber-300' : 'text-red-200'">{{ t('Đo #{0}', [item.id]) }}</span>
+                            <span class="flex items-center gap-2">
+                                <span class="text-sm font-bold text-slate-100">{{ formatDimDistance(item.distance) }}</span>
+                                <button @click.stop="removeDimension(item.id)" :title="t('Xóa nhóm đo')"
+                                    class="rounded p-1 text-slate-400 hover:bg-rose-900/60 hover:text-rose-300"><i class="ph-bold ph-x"></i></button>
+                            </span>
+                        </div>
+                        <div class="mt-1 font-mono text-[9px] text-slate-500">
+                            <div>P1 ({{ item.p1.map(v => v.toFixed(3)).join(', ') }})</div>
+                            <div>P2 ({{ item.p2.map(v => v.toFixed(3)).join(', ') }})</div>
+                        </div>
+                    </div>
+                    <p v-if="!dimItems.length" class="p-5 text-center text-xs text-slate-500">{{ t('Chưa có phép đo nào. Bấm D rồi click 2 điểm trên mô hình.') }}</p>
+                </div>
+            </div>
 
         </aside>
 
-        <div v-show="showLeftPanel" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng panel trái"
-            title="Kéo để thay đổi độ rộng panel trái" tabindex="0" :style="{ left: `${leftPanelWidth}px` }"
+        <div v-show="showLeftPanel" role="separator" aria-orientation="vertical" :aria-label="t('Kéo để đổi độ rộng panel trái')"
+            :title="t('Kéo để thay đổi độ rộng panel trái')" tabindex="0" :style="{ left: `${leftPanelWidth}px` }"
             @pointerdown="startPanelResize('left', $event)" @pointermove="updatePanelResize"
             @pointerup="endPanelResize" @pointercancel="endPanelResize" @lostpointercapture="endPanelResize"
             @keydown.right.prevent="adjustPanelWidth('left', 16)" @keydown.left.prevent="adjustPanelWidth('left', -16)"
@@ -886,15 +932,15 @@
                         <div v-for="face in viewCubeFaces" :key="face.id" class="vc-face" :style="{ transform: face.transform }">
                             <button v-for="cell in face.cells" :key="cell.id" type="button"
                                 class="vc-cell" :class="[cell.kind, hoverViewDir === cell.key ? 'vc-hot' : '']"
-                                :title="cell.title"
+                                :title="t('Nhìn từ {0}', [cell.names.map(name => t(name)).join('-')])"
                                 @click="setViewDirection(cell.dir)"
                                 @mouseenter="hoverViewDir = cell.key" @mouseleave="hoverViewDir = ''">
-                                <span v-if="cell.kind === 'vc-face-cell'">{{ face.label }}</span>
+                                <span v-if="cell.kind === 'vc-face-cell'">{{ t(face.label) }}</span>
                             </button>
                         </div>
                     </div>
                 </div>
-                <svg viewBox="0 0 100 100" class="vc-axes" aria-label="Hướng các trục tọa độ, quy ước xây dựng đổi vị trí Y và Z">
+                <svg viewBox="0 0 100 100" class="vc-axes" :aria-label="t('Hướng các trục tọa độ, quy ước xây dựng đổi vị trí Y và Z')">
                     <defs>
                         <marker id="axisGizmoArrowX" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
                             <path d="M0,0 L7,3.5 L0,7 Z" fill="#ef4444"></path>
@@ -920,7 +966,7 @@
             <div v-if="isIfcDragOver" class="absolute inset-3 z-30 rounded-2xl border-2 border-dashed border-cyan-400 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
                 <div class="text-center text-cyan-200">
                     <i class="ph-bold ph-download-simple text-4xl"></i>
-                    <p class="mt-2 text-sm font-semibold">Thả file IFC để thêm vào Combine</p>
+                    <p class="mt-2 text-sm font-semibold">{{ t('Thả file IFC để thêm vào Combine') }}</p>
                 </div>
             </div>
 
@@ -934,18 +980,16 @@
                     </div>
                     <div>
                         <h3 class="text-sm font-semibold" :class="isLightBackground ? 'text-slate-900' : 'text-white'">
-                            {{ isSampleModel ? 'Mô hình mẫu Cột & Cốt thép 3D' : 'Chưa có file IFC trong view' }}
+                            {{ isSampleModel ? t('Mô hình mẫu Cột & Cốt thép 3D') : t('Chưa có file IFC trong view') }}
                         </h3>
-                        <p v-if="isSampleModel" class="text-xs mt-1 leading-relaxed" :class="isLightBackground ? 'text-slate-600' : 'text-slate-400'">
-                            View nền sáng rõ, thép phân màu theo <strong class="text-amber-500">Phi (Ø)</strong>. Bấm <strong class="text-cyan-600">CropBox</strong> để kéo mũi tên 6 mặt độc lập, hoặc đổi sang <strong class="text-indigo-600">Orthographic</strong>!
-                        </p>
+                        <p v-if="isSampleModel" class="text-xs mt-1 leading-relaxed" :class="isLightBackground ? 'text-slate-600' : 'text-slate-400'" v-html="t('View nền sáng rõ, thép phân màu theo <strong class=\'text-amber-500\'>Phi (Ø)</strong>. Bấm <strong class=\'text-cyan-600\'>CropBox</strong> để kéo mũi tên 6 mặt độc lập, hoặc đổi sang <strong class=\'text-indigo-600\'>Orthographic</strong>!')"></p>
                         <p v-else class="text-xs mt-1 leading-relaxed" :class="isLightBackground ? 'text-slate-600' : 'text-slate-400'">
-                            Mở IFC, thêm file trong tab Combine hoặc kéo thả file IFC vào vùng 3D.
+                            {{ t('Mở IFC, thêm file trong tab Combine hoặc kéo thả file IFC vào vùng 3D.') }}
                         </p>
                         <div class="mt-3 pt-2.5 border-t border-slate-300/60 grid grid-cols-3 gap-2 text-[11px]" :class="isLightBackground ? 'text-slate-500' : 'text-slate-400'">
-                            <div class="flex items-center gap-1"><i class="ph-bold ph-mouse-left-click text-blue-500"></i> Xoay: Trái</div>
-                            <div class="flex items-center gap-1"><i class="ph-bold ph-mouse-middle-click text-blue-500"></i> Pan: Giữa</div>
-                            <div class="flex items-center gap-1"><i class="ph-bold ph-mouse-right-click text-blue-500"></i> Dịch: Phải</div>
+                            <div class="flex items-center gap-1"><i class="ph-bold ph-mouse-left-click text-blue-500"></i> {{ t('Xoay: Trái') }}</div>
+                            <div class="flex items-center gap-1"><i class="ph-bold ph-mouse-middle-click text-blue-500"></i> {{ t('Pan: Giữa') }}</div>
+                            <div class="flex items-center gap-1"><i class="ph-bold ph-mouse-right-click text-blue-500"></i> {{ t('Dịch: Phải') }}</div>
                         </div>
                     </div>
                 </div>
@@ -956,54 +1000,54 @@
                 class="absolute bottom-3 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] backdrop-blur px-3 py-1.5 rounded-3xl border pointer-events-none select-none"
                 :class="isLightBackground ? 'bg-white/80 border-slate-300 text-slate-700 shadow-sm' : 'bg-slate-900/80 border-slate-800 text-slate-400'">
                 <span class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full" :class="wasmReady ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'"></span>
-                    {{ wasmReady ? 'Sẵn sàng' : 'Đang nạp WASM...' }}
+                    <span class="w-2 h-2 rounded-full" :class="statusIndicator.dotClass"></span>
+                    {{ t(statusIndicator.label) }}
                 </span>
                 <span>|</span>
-                <span>Cấu kiện: <strong :class="isLightBackground ? 'text-slate-900' : 'text-slate-200'">{{ stats.meshes }}</strong></span>
+                <span>{{ t('Cấu kiện:') }} <strong :class="isLightBackground ? 'text-slate-900' : 'text-slate-200'">{{ stats.meshes }}</strong></span>
                 <span>|</span>
-                <span>Ẩn: <strong :class="isLightBackground ? 'text-slate-900' : 'text-slate-200'">{{ hiddenObjectCount }}</strong></span>
+                <span>{{ t('Ẩn:') }} <strong :class="isLightBackground ? 'text-slate-900' : 'text-slate-200'">{{ hiddenObjectCount }}</strong></span>
                 <span>|</span>
-                <span>Đã xóa: <strong :class="isLightBackground ? 'text-slate-900' : 'text-slate-200'">{{ deletedObjectCount }}</strong></span>
+                <span>{{ t('Đã xóa:') }} <strong :class="isLightBackground ? 'text-slate-900' : 'text-slate-200'">{{ deletedObjectCount }}</strong></span>
                 <span>|</span>
-                <span>File mở: <strong :class="isLightBackground ? 'text-slate-900' : 'text-slate-200'">{{ openFileCount }}</strong></span>
+                <span>{{ t('File mở:') }} <strong :class="isLightBackground ? 'text-slate-900' : 'text-slate-200'">{{ openFileCount }}</strong></span>
                 <span v-if="selectedMeshes.length > 0">|</span>
-                <span v-if="selectedMeshes.length > 0" class="text-amber-500 font-bold">Đã chọn: {{ selectedMeshes.length }}</span>
+                <span v-if="selectedMeshes.length > 0" class="text-amber-500 font-bold">{{ t('Đã chọn: {0}', [selectedMeshes.length]) }}</span>
                 <span>|</span>
                 <!-- Độ mờ toàn bộ mô hình (bên trái nút Persp/Ortho) -->
-                <label class="pointer-events-auto flex items-center gap-1.5 cursor-pointer" title="Độ mờ toàn bộ mô hình">
+                <label class="pointer-events-auto flex items-center gap-1.5 cursor-pointer" :title="t('Độ mờ toàn bộ mô hình')">
                     <i class="ph-bold ph-eye text-sm"></i>
                     <input v-model.number="modelOpacityPercent" @input="updateModelOpacity" @change="persistModelOpacity"
                         type="range" min="0" max="100" step="1" class="w-20 accent-sky-500 cursor-pointer"
-                        aria-label="Độ mờ toàn bộ mô hình">
+                        :aria-label="t('Độ mờ toàn bộ mô hình')">
                     <span class="w-8 text-right font-mono">{{ modelOpacityPercent }}%</span>
                 </label>
                 <!-- Nút chuyển nền sáng/tối (đồng bộ với mục Option) -->
                 <button type="button" @click="setBackgroundTheme(!isLightBackground)"
                     class="pointer-events-auto w-6 h-6 -mx-1 flex items-center justify-center rounded-md text-sm leading-none cursor-pointer transition active:scale-90"
                     :class="isLightBackground ? 'hover:bg-slate-200' : 'hover:bg-slate-700'"
-                    :title="isLightBackground ? 'Nền sáng - bấm để chuyển sang nền tối' : 'Nền tối - bấm để chuyển sang nền sáng'"
-                    :aria-label="isLightBackground ? 'Chuyển sang nền tối' : 'Chuyển sang nền sáng'">{{ isLightBackground ? '☀️' : '🌚' }}</button>
+                    :title="isLightBackground ? t('Nền sáng - bấm để chuyển sang nền tối') : t('Nền tối - bấm để chuyển sang nền sáng')"
+                    :aria-label="isLightBackground ? t('Chuyển sang nền tối') : t('Chuyển sang nền sáng')">{{ isLightBackground ? '☀️' : '🌚' }}</button>
                 <!-- Nút chuyển Perspective / Orthographic -->
                 <button type="button" @click="toggleCameraProjection"
                     class="pointer-events-auto px-2.5 py-0.5 rounded-md border text-[11px] font-semibold cursor-pointer transition active:scale-95"
                     :class="isOrthographic
                         ? (isLightBackground ? 'bg-indigo-100 border-indigo-300 text-indigo-700 hover:bg-indigo-200' : 'bg-indigo-900/60 border-indigo-500/60 text-indigo-300 hover:bg-indigo-800/70')
                         : (isLightBackground ? 'bg-blue-100 border-blue-300 text-blue-700 hover:bg-blue-200' : 'bg-blue-900/60 border-blue-500/60 text-blue-300 hover:bg-blue-800/70')"
-                    :title="isOrthographic ? 'Đang Orthographic - bấm để chuyển sang Perspective' : 'Đang Perspective - bấm để chuyển sang Orthographic'">
-                    {{ isOrthographic ? 'Ortho' : 'Persp' }}
+                    :title="isOrthographic ? t('Đang Orthographic - bấm để chuyển sang Perspective') : t('Đang Perspective - bấm để chuyển sang Orthographic')">
+                    {{ isOrthographic ? t('Trực giao') : t('Phối cảnh') }}
                 </button>
                 <span v-if="isCropBoxActive">|</span>
-                <span v-if="isCropBoxActive" class="text-cyan-500 font-semibold">[CropBox 6 Mặt]</span>
+                <span v-if="isCropBoxActive" class="text-cyan-500 font-semibold">{{ t('[CropBox 6 Mặt]') }}</span>
                 <span v-if="hoveredType">|</span>
-                <span v-if="hoveredType" class="text-blue-500 font-medium truncate max-w-[200px]">Trỏ: {{ hoveredType }}</span>
+                <span v-if="hoveredType" class="text-blue-500 font-medium truncate max-w-[200px]">{{ t('Trỏ: {0}', [hoveredType]) }}</span>
             </div>
 
             <!-- Overlay Loading Spinner -->
             <div v-if="isLoading" class="absolute inset-0 z-30 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-4">
                 <div class="w-14 h-14 border-4 border-slate-700 border-t-amber-500 rounded-full animate-spin mb-4"></div>
                 <p class="text-base font-semibold text-white">{{ loadingText }}</p>
-                <p class="text-xs text-slate-400 mt-1">Đang tối ưu dựng hình & cấu trúc dữ liệu...</p>
+                <p class="text-xs text-slate-400 mt-1">{{ t('Đang tối ưu dựng hình & cấu trúc dữ liệu...') }}</p>
             </div>
 
             <!-- Toast Message -->
@@ -1022,8 +1066,8 @@
         </div>
 
         <!-- 3. PANEL BÊN PHẢI: TRA CỨU, CHỈNH SỬA THUỘC TÍNH (ATTRIBUTE) & PROPERTY SETS -->
-        <div v-show="showRightPanel" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng panel phải"
-            title="Kéo để thay đổi độ rộng panel phải" tabindex="0" :style="{ right: `${rightPanelWidth}px` }"
+        <div v-show="showRightPanel" role="separator" aria-orientation="vertical" :aria-label="t('Kéo để đổi độ rộng panel phải')"
+            :title="t('Kéo để thay đổi độ rộng panel phải')" tabindex="0" :style="{ right: `${rightPanelWidth}px` }"
             @pointerdown="startPanelResize('right', $event)" @pointermove="updatePanelResize"
             @pointerup="endPanelResize" @pointercancel="endPanelResize" @lostpointercapture="endPanelResize"
             @keydown.right.prevent="adjustPanelWidth('right', -16)" @keydown.left.prevent="adjustPanelWidth('right', 16)"
@@ -1038,17 +1082,17 @@
                 <div class="flex items-center gap-2">
                     <i class="ph-bold ph-pencil-simple-line text-emerald-400"></i>
                     <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">
-                        {{ selectedMeshes.length > 1 ? `Đang chọn (${selectedMeshes.length}) đối tượng` : 'Thuộc tính & Chỉnh sửa' }}
+                        {{ selectedMeshes.length > 1 ? t('Đang chọn ({0}) đối tượng', [selectedMeshes.length]) : (!selectedObject && currentProjectInfo ? t('Thông tin dự án') : t('Thuộc tính & Chỉnh sửa')) }}
                     </h2>
                 </div>
                 <div class="flex items-center gap-2">
                     <button v-if="selectedObject && isEditingAttributes" @click="saveAttributeChanges" 
                         :disabled="!hasAttributeChanges"
                         class="text-xs bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-2 py-1 rounded flex items-center gap-1 font-medium transition">
-                        <i class="ph-bold ph-check"></i> Lưu sửa
+                        <i class="ph-bold ph-check"></i> {{ t('Lưu sửa') }}
                     </button>
                     <button v-if="selectedMeshes.length > 0" @click="clearSelection" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 bg-slate-800 px-2 py-1 rounded">
-                        <i class="ph-bold ph-x"></i> Đóng
+                        <i class="ph-bold ph-x"></i> {{ t('Đóng') }}
                     </button>
                 </div>
             </div>
@@ -1064,7 +1108,7 @@
                                 {{ selectedObject.type }}
                             </span>
                             <h3 class="text-sm font-bold text-white mt-1.5 break-words">
-                                {{ selectedObject.name || 'Không có tên (Unnamed)' }}
+                                {{ selectedObject.name || t('Chưa đặt tên') }}
                             </h3>
                         </div>
                         <div v-if="selectedObject.isRebar" class="shrink-0 p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
@@ -1075,11 +1119,11 @@
                     
                     <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/60 text-xs">
                         <div>
-                            <span class="text-slate-400 block text-[11px]">Express ID</span>
+                            <span class="text-slate-400 block text-[11px]">{{ t('Express ID') }}</span>
                             <span class="font-mono font-semibold text-amber-400">#{{ selectedObject.expressID }}</span>
                         </div>
                         <div v-if="selectedObject.globalId">
-                            <span class="text-slate-400 block text-[11px]">GlobalId</span>
+                            <span class="text-slate-400 block text-[11px]">{{ t('GlobalId') }}</span>
                             <span class="font-mono text-[11px] text-slate-200 truncate block" :title="selectedObject.globalId">
                                 {{ selectedObject.globalId }}
                             </span>
@@ -1091,34 +1135,34 @@
                 <div class="bg-gradient-to-br from-emerald-950/30 to-slate-900 border border-emerald-500/40 rounded-xl p-3.5 space-y-3">
                     <div class="flex items-center justify-between">
                         <h4 class="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                            <i class="ph-bold ph-pencil"></i> Chỉnh sửa Attributes
+                            <i class="ph-bold ph-pencil"></i> {{ t('Chỉnh sửa Attributes') }}
                         </h4>
                         <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                            Editable
+                            {{ t('Có thể sửa') }}
                         </span>
                     </div>
 
                     <div class="space-y-2.5 text-xs">
                         <div>
-                            <label class="text-[11px] font-medium text-slate-300 mb-1 block">Tên cấu kiện (Name):</label>
+                            <label class="text-[11px] font-medium text-slate-300 mb-1 block">{{ t('Tên cấu kiện (Name):') }}</label>
                             <input type="text" v-model="editableAttributes.Name" 
                                 class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none">
                         </div>
 
                         <div>
-                            <label class="text-[11px] font-medium text-slate-300 mb-1 block">Kiểu đối tượng (ObjectType):</label>
+                            <label class="text-[11px] font-medium text-slate-300 mb-1 block">{{ t('Kiểu đối tượng (ObjectType):') }}</label>
                             <input type="text" v-model="editableAttributes.ObjectType" 
                                 class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none">
                         </div>
 
                         <div>
-                            <label class="text-[11px] font-medium text-slate-300 mb-1 block">Số hiệu / Pos / Tag (Tag):</label>
+                            <label class="text-[11px] font-medium text-slate-300 mb-1 block">{{ t('Số hiệu / Pos / Tag (Tag):') }}</label>
                             <input type="text" v-model="editableAttributes.Tag" 
                                 class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none">
                         </div>
 
                         <div>
-                            <label class="text-[11px] font-medium text-slate-300 mb-1 block">Mô tả (Description):</label>
+                            <label class="text-[11px] font-medium text-slate-300 mb-1 block">{{ t('Mô tả (Description):') }}</label>
                             <input type="text" v-model="editableAttributes.Description" 
                                 class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none">
                         </div>
@@ -1128,10 +1172,10 @@
                                 :disabled="!hasAttributeChanges"
                                 class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-semibold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition shadow">
                                 <i class="ph-bold ph-check"></i>
-                                <span>Áp dụng vào IFC</span>
+                                <span>{{ t('Áp dụng vào IFC') }}</span>
                             </button>
                             <button @click="resetEditableAttributes" 
-                                class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700" title="Khôi phục giá trị ban đầu">
+                                class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700" :title="t('Khôi phục giá trị ban đầu')">
                                 <i class="ph-bold ph-arrow-counter-clockwise"></i>
                             </button>
                         </div>
@@ -1141,23 +1185,23 @@
                 <!-- THÔNG SỐ CỐT THÉP THEO PHI (Ø) -->
                 <div v-if="selectedObject.rebarDetails" class="bg-gradient-to-br from-amber-950/40 to-slate-900 border border-amber-500/40 rounded-xl p-3.5 space-y-2.5">
                     <h4 class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <i class="ph-bold ph-wrench"></i> Đặc tính Cốt thép / Khớp nối
+                        <i class="ph-bold ph-wrench"></i> {{ t('Đặc tính Cốt thép / Khớp nối') }}
                     </h4>
                     <div class="grid grid-cols-2 gap-2 text-xs">
                         <div class="bg-slate-900/80 border border-amber-500/20 rounded-lg p-2">
-                            <span class="text-[10px] text-amber-400/80 block uppercase font-medium">Đường kính (Ø)</span>
+                            <span class="text-[10px] text-amber-400/80 block uppercase font-medium">{{ t('Đường kính (Ø)') }}</span>
                             <span class="text-sm font-bold text-white font-mono">{{ selectedObject.rebarDetails.barDiameter || '—' }}</span>
                         </div>
                         <div class="bg-slate-900/80 border border-amber-500/20 rounded-lg p-2">
-                            <span class="text-[10px] text-amber-400/80 block uppercase font-medium">Mác thép</span>
+                            <span class="text-[10px] text-amber-400/80 block uppercase font-medium">{{ t('Mác thép') }}</span>
                             <span class="text-sm font-bold text-amber-200 truncate block">{{ selectedObject.rebarDetails.steelGrade || '—' }}</span>
                         </div>
                         <div class="bg-slate-900/80 border border-amber-500/20 rounded-lg p-2">
-                            <span class="text-[10px] text-amber-400/80 block uppercase font-medium">Chiều dài (L)</span>
+                            <span class="text-[10px] text-amber-400/80 block uppercase font-medium">{{ t('Chiều dài (L)') }}</span>
                             <span class="text-sm font-bold text-white font-mono">{{ selectedObject.rebarDetails.barLength || '—' }}</span>
                         </div>
                         <div class="bg-slate-900/80 border border-amber-500/20 rounded-lg p-2">
-                            <span class="text-[10px] text-amber-400/80 block uppercase font-medium">Tag / Pos Mark</span>
+                            <span class="text-[10px] text-amber-400/80 block uppercase font-medium">{{ t('Tag / Pos Mark') }}</span>
                             <span class="text-sm font-bold text-blue-300 truncate block">{{ selectedObject.rebarDetails.tagMark || '—' }}</span>
                         </div>
                     </div>
@@ -1166,7 +1210,7 @@
                 <!-- Kích thước hình học -->
                 <div v-if="selectedObject.dimensions">
                     <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <i class="ph-bold ph-ruler"></i> Kích thước bao (Bounding Box)
+                        <i class="ph-bold ph-ruler"></i> {{ t('Kích thước bao (Bounding Box)') }}
                     </h4>
                     <div class="grid grid-cols-3 gap-2 text-center">
                         <div class="bg-slate-800/50 border border-slate-800 rounded-lg p-2">
@@ -1187,7 +1231,7 @@
                 <!-- BẢNG PROPERTY SETS (PSETS) -->
                 <div>
                     <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <i class="ph-bold ph-folders text-amber-400"></i> Property Sets (Psets)
+                        <i class="ph-bold ph-folders text-amber-400"></i> {{ t('Property Sets (Psets)') }}
                     </h4>
                     
                     <div v-if="selectedObject.psets && selectedObject.psets.length > 0" class="space-y-2.5">
@@ -1198,7 +1242,7 @@
                                     <i class="ph-bold ph-folder"></i>
                                     {{ pset.name }}
                                 </span>
-                                <span class="text-[10px] text-slate-500 font-mono">{{ pset.properties.length }} props</span>
+                                <span class="text-[10px] text-slate-500 font-mono">{{ t('{0} thuộc tính', [pset.properties.length]) }}</span>
                             </div>
                             <div class="divide-y divide-slate-800/60 text-xs">
                                 <div v-for="(prop, pIdx) in pset.properties" :key="pIdx" 
@@ -1211,14 +1255,14 @@
                         </div>
                     </div>
                     <div v-else class="p-3 bg-slate-950/40 border border-slate-800 rounded-xl text-xs text-slate-500 text-center">
-                        Không có Property Set nào liên kết qua IfcRelDefinesByProperties.
+                        {{ t('Không có Property Set nào liên kết qua IfcRelDefinesByProperties.') }}
                     </div>
                 </div>
 
                 <!-- DANH SÁCH TOÀN BỘ ATTRIBUTES GỐC -->
                 <div>
                     <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <i class="ph-bold ph-list-dashes"></i> Toàn bộ Attributes
+                        <i class="ph-bold ph-list-dashes"></i> {{ t('Toàn bộ Attributes') }}
                     </h4>
                     <div class="bg-slate-950/60 border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800/80">
                         <div v-for="(val, key) in selectedObject.attributes" :key="key" 
@@ -1232,14 +1276,65 @@
 
             </div>
 
+            <!-- THÔNG TIN DỰ ÁN của file IFC đang mở (khi chưa chọn cấu kiện) -->
+            <div v-else-if="currentProjectInfo" class="flex-1 flex flex-col overflow-hidden">
+                <div class="flex-1 overflow-y-auto p-4 space-y-3">
+                    <div v-if="sourceFiles.length > 1">
+                        <label class="text-[11px] font-medium text-slate-300 mb-1 block">{{ t('File IFC') }}</label>
+                        <select v-model="projectInfoSourceId"
+                            class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none">
+                            <option v-for="source in sourceFiles" :key="source.id" :value="source.id">{{ source.name }}</option>
+                        </select>
+                    </div>
+                    <p class="text-[11px] leading-relaxed text-slate-400">{{ t('Sửa các thông tin của dự án rồi bấm "Áp dụng vào IFC"; sau đó bấm "Lưu file IFC" để tạo file IFC mới. Ô đã sửa có viền vàng.') }}</p>
+
+                    <details v-for="section in currentProjectInfo.sections" :key="section.key" :open="section.open"
+                        @toggle="section.open = $event.target.open"
+                        class="bg-slate-800/50 border border-slate-700/70 rounded-xl overflow-hidden">
+                        <summary class="px-3 py-2 cursor-pointer select-none flex items-center justify-between gap-2 hover:bg-slate-800">
+                            <span class="min-w-0">
+                                <span class="block text-[11px] font-bold text-emerald-300">{{ t(section.title) }}</span>
+                                <span v-if="section.subtitle" class="block text-[10px] text-slate-400 truncate">{{ section.subtitle }}</span>
+                            </span>
+                            <span v-if="section.expressID !== null" class="shrink-0 font-mono text-[10px] text-amber-400">#{{ section.expressID }}</span>
+                        </summary>
+                        <div class="p-3 space-y-2.5 border-t border-slate-700/60 text-xs">
+                            <div v-for="field in section.fields" :key="field.id">
+                                <label class="text-[11px] font-medium text-slate-300 mb-1 block">{{ t(field.label) }}</label>
+                                <textarea v-if="field.kind === 'list'" v-model="field.value" rows="2"
+                                    :class="field.value !== field.original ? 'border-amber-500' : 'border-slate-700 focus:border-emerald-500'"
+                                    class="w-full bg-slate-950 border rounded-lg px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none"></textarea>
+                                <input v-else type="text" v-model="field.value" :readonly="field.readonly"
+                                    :class="[field.value !== field.original ? 'border-amber-500' : 'border-slate-700 focus:border-emerald-500', field.readonly ? 'text-slate-400' : 'text-white']"
+                                    class="w-full bg-slate-950 border rounded-lg px-2.5 py-1.5 font-mono text-xs focus:outline-none">
+                            </div>
+                        </div>
+                    </details>
+                </div>
+                <div class="p-3 border-t border-slate-800 bg-slate-900/80 flex gap-2">
+                    <button @click="applyProjectInfoChanges" :disabled="!projectInfoDirty"
+                        class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-xs font-semibold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition">
+                        <i class="ph-bold ph-check"></i> {{ t('Áp dụng vào IFC') }}
+                    </button>
+                    <button @click="resetProjectInfo" :disabled="!projectInfoDirty" :title="t('Khôi phục giá trị ban đầu')"
+                        class="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700">
+                        <i class="ph-bold ph-arrow-counter-clockwise"></i>
+                    </button>
+                    <button @click="exportModifiedIFC" :disabled="isLoading || !wasmReady || !hasUnsavedChanges"
+                        class="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-xs font-semibold py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition">
+                        <i class="ph-bold ph-floppy-disk"></i> {{ t('Lưu file IFC') }}
+                    </button>
+                </div>
+            </div>
+
             <!-- Panel trống khi chưa chọn đối tượng -->
             <div v-else class="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-500">
                 <div class="w-14 h-14 rounded-full bg-slate-800/60 flex items-center justify-center mb-3 border border-slate-800">
                     <i class="ph-duotone ph-cursor-click text-2xl text-slate-400"></i>
                 </div>
-                <p class="text-sm font-medium text-slate-300">Chưa chọn cấu kiện nào</p>
+                <p class="text-sm font-medium text-slate-300">{{ t('Chưa chọn cấu kiện nào') }}</p>
                 <p class="text-xs text-slate-500 mt-1 max-w-[220px] leading-relaxed">
-                    Nhấp vào thanh thép, dầm, cột, sàn hoặc giữ Ctrl để chọn thêm đối tượng. Chuột phải vào thuộc tính bất kỳ để mở menu ngữ cảnh.
+                    {{ t('Nhấp vào thanh thép, dầm, cột, sàn hoặc giữ Ctrl để chọn thêm đối tượng. Chuột phải vào thuộc tính bất kỳ để mở menu ngữ cảnh.') }}
                 </p>
             </div>
         </aside>
@@ -1257,9 +1352,9 @@
                                 <i class="ph-bold ph-cube text-2xl text-white"></i>
                             </div>
                             <div class="min-w-0">
-                                <div class="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-400">{{ introPanelContent.badge }}</div>
-                                <h2 class="text-xl sm:text-2xl font-bold text-white">{{ introPanelContent.title }}</h2>
-                                <p class="mt-2 max-w-2xl text-xs sm:text-sm leading-relaxed text-slate-300">{{ introPanelContent.subtitle }}</p>
+                                <div class="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-400">{{ t(introPanelContent.badge) }}</div>
+                                <h2 class="text-xl sm:text-2xl font-bold text-white">{{ t(introPanelContent.title) }}</h2>
+                                <p class="mt-2 max-w-2xl text-xs sm:text-sm leading-relaxed text-slate-300">{{ t(introPanelContent.subtitle) }}</p>
                             </div>
                         </div>
                     </div>
@@ -1270,47 +1365,54 @@
                             class="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
                             <div class="flex items-center gap-2 text-emerald-400">
                                 <i :class="`ph-bold ${feature.icon}`" class="text-lg"></i>
-                                <h3 class="text-sm font-bold text-slate-100">{{ feature.title }}</h3>
+                                <h3 class="text-sm font-bold text-slate-100">{{ t(feature.title) }}</h3>
                             </div>
-                            <p class="mt-2 text-xs leading-relaxed text-slate-400">{{ feature.text }}</p>
+                            <p class="mt-2 text-xs leading-relaxed text-slate-400">{{ t(feature.text) }}</p>
                         </article>
                     </div>
 
                     <div class="grid gap-3 px-4 pb-4 sm:grid-cols-2 sm:px-6">
                         <article class="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-blue-300">{{ introPanelContent.advantageTitle }}</h3>
-                            <p class="mt-2 text-xs leading-relaxed text-slate-300">{{ introPanelContent.advantageText }}</p>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-blue-300">{{ t(introPanelContent.advantageTitle) }}</h3>
+                            <p class="mt-2 text-xs leading-relaxed text-slate-300">{{ t(introPanelContent.advantageText) }}</p>
                         </article>
                         <article class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-amber-300">{{ introPanelContent.roadmapTitle }}</h3>
-                            <p class="mt-2 text-xs leading-relaxed text-slate-300">{{ introPanelContent.roadmapText }}</p>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-amber-300">{{ t(introPanelContent.roadmapTitle) }}</h3>
+                            <p class="mt-2 text-xs leading-relaxed text-slate-300">{{ t(introPanelContent.roadmapText) }}</p>
                         </article>
                     </div>
 
                     <div class="sticky bottom-0 flex items-center justify-between border-t border-slate-800 bg-slate-900 px-4 py-3 sm:px-6">
                         <label class="flex items-center gap-2 text-[11px] text-slate-400">
                             <input type="checkbox" v-model="dontShowIntroAgain" class="rounded border-slate-600 bg-slate-950 text-emerald-500">
-                            Không hiển thị lại
+                            {{ t('Không hiển thị lại') }}
                         </label>
-                        <button type="button" @click="closeIntroPanel"
-                            class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-lg hover:bg-emerald-500">
-                            Bắt đầu sử dụng
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" @click="toggleLanguage" :title="t('Chuyển ngôn ngữ giao diện')" :aria-label="t('Chuyển ngôn ngữ giao diện')"
+                                class="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700">
+                                <i class="ph-bold ph-translate text-sm text-emerald-400"></i>
+                                <span>[<span :class="lang === 'vi' ? 'text-emerald-400' : 'text-slate-500'">VI</span>/<span :class="lang === 'en' ? 'text-emerald-400' : 'text-slate-500'">EN</span>]</span>
+                            </button>
+                            <button type="button" @click="closeIntroPanel"
+                                class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-lg hover:bg-emerald-500">
+                                {{ t('Bắt đầu sử dụng') }}
+                            </button>
+                        </div>
                     </div>
                 </section>
             </div>
 
             <div v-if="showTransportProfileModal" class="fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4">
                 <form @submit.prevent="saveTransportProfile" class="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-4 shadow-2xl space-y-3">
-                    <h3 class="text-sm font-bold text-slate-100">Lưu bộ tọa độ</h3>
+                    <h3 class="text-sm font-bold text-slate-100">{{ t('Lưu bộ tọa độ') }}</h3>
                     <label class="block text-[11px] text-slate-400">
-                        Tên profile
+                        {{ t('Tên profile') }}
                         <input ref="transportProfileNameInput" v-model="transportProfileName" type="text" maxlength="80" required
                             class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
                     </label>
                     <div class="flex justify-end gap-2">
-                        <button type="button" @click="showTransportProfileModal = false" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs">Hủy</button>
-                        <button type="submit" class="px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold">Lưu profile</button>
+                        <button type="button" @click="showTransportProfileModal = false" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs">{{ t('Hủy') }}</button>
+                        <button type="submit" class="px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold">{{ t('Lưu profile') }}</button>
                     </div>
                 </form>
             </div>
@@ -1319,23 +1421,23 @@
         :style="{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }"
         class="fixed z-50 w-56 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden py-1 text-xs select-none">
         <div class="px-3 py-1.5 border-b border-slate-800 bg-slate-950/50">
-            <span class="text-[10px] text-slate-400 block">Thuộc tính:</span>
+            <span class="text-[10px] text-slate-400 block">{{ t('Thuộc tính:') }}</span>
             <span class="font-bold text-amber-300 truncate block">{{ contextMenu.attrKey }}: {{ contextMenu.attrValue }}</span>
         </div>
         <button @click="contextMenuAction('selectSimilar')" 
             class="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-200">
             <i class="ph-bold ph-check-square-offset text-blue-400"></i>
-            <span>Select similar (Chọn tương tự)</span>
+            <span>{{ t('Chọn tương tự') }}</span>
         </button>
         <button @click="contextMenuAction('showSimilar')" 
             class="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-200">
             <i class="ph-bold ph-eye text-emerald-400"></i>
-            <span>Show similar (Chỉ hiện tương tự)</span>
+            <span>{{ t('Chỉ hiện tương tự') }}</span>
         </button>
         <button @click="contextMenuAction('filterWithAttribute')" 
             class="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-200">
             <i class="ph-bold ph-funnel text-amber-400"></i>
-            <span>Filter with attribute (Lọc theo giá trị)</span>
+            <span>{{ t('Lọc theo giá trị') }}</span>
         </button>
     </div>
 

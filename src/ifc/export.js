@@ -1,26 +1,28 @@
 import { getMeshKey, visibleExportItems } from '../core/helpers.js';
 import { applyIfcTransportToModel } from './transport.js';
+import { applyHeaderOverrides } from './project-info.js';
 import { deletedItems, editHistoryCount, fileName, hasUnsavedChanges, isLoading, isSampleModel, loadingText, pendingDeletedExpressIDs, rt, sourceFiles } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
+import { t } from '../i18n/index.js';
 
 export const exportModifiedIFC = () => {
     if (isSampleModel.value || rt.currentModelID === null) {
-        showToast('Chưa có IFC để lưu', 'Mở ít nhất một file IFC thật trước khi lưu file mới.', 'error');
+        showToast(t('Chưa có IFC để lưu'), t('Mở ít nhất một file IFC thật trước khi lưu file mới.'), 'error');
         return;
     }
 
     try {
         isLoading.value = true;
-        loadingText.value = 'Đang tạo IFC kết hợp và áp dụng danh sách xóa...';
+        loadingText.value = t('Đang tạo IFC kết hợp và áp dụng danh sách xóa...');
         const data = createFilteredIfcData('edited');
         downloadIfcData(data, sourceFiles.value.length > 1 ? '_combined_edited' : '_edited');
         editHistoryCount.value = 0;
         hasUnsavedChanges.value = false;
-        showToast('Xuất tệp thành công!', `Đã lưu IFC với ${pendingDeletedExpressIDs.size} cấu kiện đã xóa.`, 'success');
+        showToast(t('Xuất tệp thành công!'), t('Đã lưu IFC với {0} cấu kiện đã xóa.', [pendingDeletedExpressIDs.size]), 'success');
 
     } catch (err) {
         console.error('Lỗi lưu file IFC:', err);
-        showToast('Lỗi xuất tệp', err.message || 'Không thể lưu file IFC.');
+        showToast(t('Lỗi xuất tệp'), err.message || t('Không thể lưu file IFC.'));
     } finally {
         isLoading.value = false;
     }
@@ -28,18 +30,18 @@ export const exportModifiedIFC = () => {
 
 export const exportVisibleIFC = () => {
     if (isSampleModel.value || rt.currentModelID === null) {
-        showToast('Thông báo', 'Hãy mở một file IFC thật trước khi xuất.');
+        showToast(t('Thông báo'), t('Hãy mở một file IFC thật trước khi xuất.'));
         return;
     }
     try {
         isLoading.value = true;
-        loadingText.value = 'Đang tạo IFC chỉ gồm các cấu kiện đang hiển thị...';
+        loadingText.value = t('Đang tạo IFC chỉ gồm các cấu kiện đang hiển thị...');
         const data = createFilteredIfcData('visible');
         downloadIfcData(data, sourceFiles.value.length > 1 ? '_combined_visible' : '_visible');
-        showToast('Xuất thành công', `Đã lưu IFC với ${visibleExportItems.value.length} cấu kiện đang hiển thị.`, 'success');
+        showToast(t('Xuất thành công'), t('Đã lưu IFC với {0} cấu kiện đang hiển thị.', [visibleExportItems.value.length]), 'success');
     } catch (err) {
         console.error('Lỗi xuất IFC đang hiển thị:', err);
-        showToast('Lỗi xuất IFC', err.message || 'Không thể xuất các cấu kiện đang hiển thị.');
+        showToast(t('Lỗi xuất IFC'), err.message || t('Không thể xuất các cấu kiện đang hiển thị.'));
     } finally {
         isLoading.value = false;
     }
@@ -47,19 +49,19 @@ export const exportVisibleIFC = () => {
 
 export const exportCombineIFC = () => {
     if (sourceFiles.value.length === 0) {
-        showToast('Chưa có file IFC', 'Mở hoặc thêm ít nhất một file IFC trước khi export.');
+        showToast(t('Chưa có file IFC'), t('Mở hoặc thêm ít nhất một file IFC trước khi xuất.'));
         return;
     }
     try {
         isLoading.value = true;
-        loadingText.value = `Đang kết hợp ${sourceFiles.value.length} file IFC...`;
+        loadingText.value = t('Đang kết hợp {0} file IFC...', [sourceFiles.value.length]);
         const buffers = sourceFiles.value.map(createTransportedSourceData);
         const combinedData = mergeIfcData(buffers);
         downloadIfcData(combinedData, '_combined');
-        showToast('Export Combine thành công', `Đã gộp ${sourceFiles.value.length} file IFC vào một file duy nhất.`);
+        showToast(t('Xuất gộp thành công'), t('Đã gộp {0} file IFC vào một file duy nhất.', [sourceFiles.value.length]));
     } catch (error) {
         console.error('Lỗi export IFC kết hợp:', error);
-        showToast('Lỗi Export Combine', error.message || 'Không thể kết hợp các file IFC.');
+        showToast(t('Lỗi xuất gộp'), error.message || t('Không thể kết hợp các file IFC.'));
     } finally {
         isLoading.value = false;
     }
@@ -67,13 +69,13 @@ export const exportCombineIFC = () => {
 
 export const createTransportedSourceData = (source) => {
     const sourceData = rt.ifcAPI.SaveModel(source.modelID);
-    if (!sourceData || sourceData.length === 0) throw new Error(`Dữ liệu IFC "${source.name}" rỗng.`);
+    if (!sourceData || sourceData.length === 0) throw new Error(t('Dữ liệu IFC "{0}" rỗng.', [source.name]));
     const tempModelID = rt.ifcAPI.OpenModel(new Uint8Array(sourceData));
-    if (tempModelID < 0) throw new Error(`Không thể mở bản IFC tạm của "${source.name}".`);
+    if (tempModelID < 0) throw new Error(t('Không thể mở bản IFC tạm của "{0}".', [source.name]));
     try {
         applyIfcTransportToModel(tempModelID, source.unitMeters || 1);
         const result = rt.ifcAPI.SaveModel(tempModelID);
-        if (!result || result.length === 0) throw new Error(`Dữ liệu IFC đã transport từ "${source.name}" rỗng.`);
+        if (!result || result.length === 0) throw new Error(t('Dữ liệu IFC đã dịch chuyển từ "{0}" rỗng.', [source.name]));
         return result;
     } finally {
         rt.ifcAPI.CloseModel(tempModelID);
@@ -81,13 +83,13 @@ export const createTransportedSourceData = (source) => {
 };
 
 export const createFilteredIfcData = (mode) => {
-    if (sourceFiles.value.length === 0) throw new Error('Chưa có file IFC để xuất.');
+    if (sourceFiles.value.length === 0) throw new Error(t('Chưa có file IFC để xuất.'));
     const results = sourceFiles.value.map(source => {
         const sourceData = rt.ifcAPI.SaveModel(source.modelID);
-        if (!sourceData || sourceData.length === 0) throw new Error(`Dữ liệu IFC "${source.name}" rỗng.`);
+        if (!sourceData || sourceData.length === 0) throw new Error(t('Dữ liệu IFC "{0}" rỗng.', [source.name]));
 
         const tempModelID = rt.ifcAPI.OpenModel(new Uint8Array(sourceData));
-        if (tempModelID < 0) throw new Error(`Không thể mở bản IFC tạm của "${source.name}".`);
+        if (tempModelID < 0) throw new Error(t('Không thể mở bản IFC tạm của "{0}".', [source.name]));
         try {
             applyIfcTransportToModel(tempModelID, source.unitMeters || 1);
             const allMeshIds = new Set();
@@ -114,7 +116,7 @@ export const createFilteredIfcData = (mode) => {
                 if (rt.ifcAPI.GetLineType(tempModelID, id) !== 0) rt.ifcAPI.DeleteLine(tempModelID, id);
             });
             const result = rt.ifcAPI.SaveModel(tempModelID);
-            if (!result || result.length === 0) throw new Error(`Dữ liệu IFC xuất ra từ "${source.name}" rỗng.`);
+            if (!result || result.length === 0) throw new Error(t('Dữ liệu IFC xuất ra từ "{0}" rỗng.', [source.name]));
             return result;
         } finally {
             rt.ifcAPI.CloseModel(tempModelID);
@@ -124,7 +126,7 @@ export const createFilteredIfcData = (mode) => {
 };
 
 export const mergeIfcData = (buffers) => {
-    if (buffers.length === 0) throw new Error('Không có dữ liệu IFC để kết hợp.');
+    if (buffers.length === 0) throw new Error(t('Không có dữ liệu IFC để kết hợp.'));
     if (buffers.length === 1) return buffers[0];
 
     const decoder = new TextDecoder('utf-8');
@@ -141,14 +143,14 @@ export const mergeIfcData = (buffers) => {
         const dataMarker = /(?:^|\n)\s*DATA\s*;/i.exec(text);
         const ending = /\bENDSEC\s*;\s*END-ISO-10303-21\s*;\s*$/i.exec(text.trimEnd());
         if (!dataMarker || !ending || ending.index <= dataMarker.index) {
-            throw new Error(`Không đọc được cấu trúc IFC-SPF của file thứ ${index + 1}.`);
+            throw new Error(t('Không đọc được cấu trúc IFC-SPF của file thứ {0}.', [index + 1]));
         }
 
         const schemaMatch = /FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i.exec(text);
         const schema = schemaMatch ? schemaMatch[1].toUpperCase() : '';
-        if (!schema) throw new Error(`Không xác định được IFC schema của file thứ ${index + 1}.`);
+        if (!schema) throw new Error(t('Không xác định được IFC schema của file thứ {0}.', [index + 1]));
         if (expectedSchema && schema !== expectedSchema) {
-            throw new Error(`Không thể gộp khác IFC schema (${expectedSchema} và ${schema}).`);
+            throw new Error(t('Không thể gộp khác IFC schema ({0} và {1}).', [expectedSchema, schema]));
         }
         expectedSchema = schema;
 
@@ -160,7 +162,7 @@ export const mergeIfcData = (buffers) => {
         let match;
         let maxId = 0;
         while ((match = idPattern.exec(body)) !== null) maxId = Math.max(maxId, Number(match[1]));
-        if (maxId === 0) throw new Error(`Không tìm thấy thực thể nào trong file thứ ${index + 1}.`);
+        if (maxId === 0) throw new Error(t('Không tìm thấy thực thể nào trong file thứ {0}.', [index + 1]));
 
         const remappedReferences = body.replace(/'(?:''|[^'])*'|\/\*[\s\S]*?\*\/|#(\d+)/g, (token, referenceId) => {
             return referenceId ? `#${Number(referenceId) + idOffset}` : token;
@@ -182,7 +184,7 @@ export const mergeIfcData = (buffers) => {
                     break;
                 }
             }
-            if (!replacement) throw new Error('Không tạo được GlobalId duy nhất khi gộp IFC.');
+            if (!replacement) throw new Error(t('Không tạo được GlobalId duy nhất khi gộp IFC.'));
             globalIds.add(replacement);
             return `${prefix}'${replacement}'`;
         });
@@ -234,7 +236,7 @@ export const removeDeletedProductsFromRelationships = (modelID, deletedIds) => {
 };
 
 export const downloadIfcData = (data, suffix) => {
-    const blob = new Blob([data], { type: 'application/octet-stream' });
+    const blob = new Blob([applyHeaderOverrides(data)], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     const originalBase = fileName.value.replace(/\.[^/.]+$/, '');
