@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+    // Đường dẫn tương đối để chạy được trên GitHub Pages (site nằm trong thư mục con /HTML_7_IFC_editor/)
+    base: './',
     define: {
         __VUE_OPTIONS_API__: true,
         __VUE_PROD_DEVTOOLS__: false,
