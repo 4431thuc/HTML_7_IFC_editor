@@ -145,6 +145,7 @@ export const EN = {
 
     // --- Tab Dịch chuyển ---
     'Xoay quanh trục Z của IFC': 'Rotate around IFC Z axis',
+    'Tâm xoay': 'Rotation center',
     'Tâm X (cm)': 'Center X (cm)',
     'Tâm xoay X (cm)': 'Rotation center X (cm)',
     'Tâm Y (cm)': 'Center Y (cm)',
@@ -162,7 +163,7 @@ export const EN = {
     'Dịch chuyển Z (cm)': 'Move Z (cm)',
     'Lưu profile': 'Save profile',
     'Dịch chuyển mô hình': 'Transport model',
-    'Tâm xoay và vector dịch tính bằng cm theo tọa độ IFC. Góc dương xoay theo chiều kim đồng hồ quanh trục Y toàn cục.': 'Rotation center and move vector are in cm in IFC coordinates. A positive angle rotates clockwise around the global Y axis.',
+    'Tâm xoay và vector dịch tính bằng cm theo tọa độ IFC. Trục theo hệ xây dựng (Z hướng lên). Góc dương xoay theo chiều kim đồng hồ quanh trục Z.': 'Rotation center and move vector are in cm in IFC coordinates. Axes follow the construction system (Z up). A positive angle rotates clockwise around the Z axis.',
     'Profile đã lưu': 'Saved profiles',
     'Lịch sử': 'History',
     'Xuất JSON': 'Export JSON',
@@ -439,7 +440,7 @@ export const EN = {
     'Nhập góc xoay hoặc vector dịch chuyển khác 0 trước khi dịch chuyển.': 'Enter a non-zero rotation angle or move vector before transporting.',
     'Không tìm thấy placement gốc trong "{0}".': 'Could not find a root placement in "{0}".',
     'Dịch chuyển thành công': 'Transport successful',
-    'Đã áp dụng xoay và dịch chuyển cho tất cả file IFC đang mở.': 'Applied rotation and move to all open IFC files.',
+    'Đã áp dụng xoay và dịch chuyển cho các file IFC đang mở ({0} file). File mở thêm sau này không bị ảnh hưởng.': 'Applied rotation and move to the currently open IFC files ({0}). Files opened later are not affected.',
     'Lỗi dịch chuyển': 'Transport error',
     'Không thể áp dụng tọa độ dịch chuyển.': 'Could not apply the transport coordinates.',
     'Không thể hoàn tác': 'Cannot undo',

@@ -44,6 +44,50 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #475569;
         }
+        /* Ô nhập số: ẩn nút tăng/giảm gốc của trình duyệt, dùng .num-field thay thế */
+        input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .num-field {
+            position: relative; display: flex; align-items: center; min-width: 0; width: 100%;
+            background: #0f172a; border: 1px solid #334155; border-radius: 0.25rem; color: #e2e8f0;
+            font-size: 10px; transition: border-color .15s;
+        }
+        .num-field:hover { border-color: #475569; }
+        .num-field:focus-within { border-color: #3b82f6; }
+        .num-field-md { font-size: 0.75rem; border-radius: 0.5rem; }
+        .num-field input {
+            flex: 1 1 auto; min-width: 0; width: 100%; background: transparent; border: 0; outline: 0;
+            color: inherit; font-size: inherit; padding: 0.375rem 0.25rem; text-align: right;
+        }
+        .num-field-md input { padding: 0.5rem 0.25rem; }
+        .num-field-prefix { padding-left: 0.4rem; color: #7dd3fc; font-weight: 700; pointer-events: none; }
+        .num-field-unit { padding-right: 0.25rem; color: #64748b; font-weight: 600; pointer-events: none; }
+        .num-field-steppers {
+            display: flex; flex-direction: column; align-self: stretch; width: 16px; flex: none;
+            border-left: 1px solid #1e293b; opacity: 0; transition: opacity .15s;
+        }
+        .num-field:hover .num-field-steppers, .num-field:focus-within .num-field-steppers { opacity: 1; }
+        .num-field-steppers button {
+            flex: 1 1 0; display: flex; align-items: center; justify-content: center; padding: 0;
+            background: transparent; border: 0; color: #94a3b8; font-size: 8px; cursor: pointer; line-height: 1;
+        }
+        .num-field-steppers button:hover { background: #1e293b; color: #7dd3fc; }
+        .num-field-steppers button:active { background: #334155; }
+        .num-field-steppers button:first-child { border-bottom: 1px solid #1e293b; border-top-right-radius: inherit; }
+        .num-field-steppers button:last-child { border-bottom-right-radius: inherit; }
+        /* Nút kiểu 3D: viền đáy đậm (màu tính từ nền nút, xem src/ui/button-style.js), chữ in hoa giãn chữ, nhấn xuống khi bấm */
+        [data-btn3d] {
+            text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
+            box-shadow: 0 3px 0 0 var(--btn-edge, rgba(0, 0, 0, 0.4)), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+            transition: transform .06s, box-shadow .06s, background-color .15s, filter .15s;
+        }
+        [data-btn3d]:hover:not(:disabled) { filter: brightness(1.06); }
+        [data-btn3d]:active:not(:disabled) {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 0 var(--btn-edge, rgba(0, 0, 0, 0.4)), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        }
+        [data-btn3d]:disabled { box-shadow: 0 2px 0 0 var(--btn-edge, rgba(0, 0, 0, 0.4)); }
         .left-tabs > button {
             flex: 1 1 4.5rem;
             min-width: 0;
@@ -708,43 +752,33 @@
                         <h3 class="text-[11px] font-bold text-sky-300 flex items-center gap-1.5">
                             <i class="ph-bold ph-arrows-clockwise"></i> {{ t('Xoay quanh trục Z của IFC') }}
                         </h3>
-                        <div class="grid grid-cols-3 gap-1.5">
-                            <input type="number" step="any" v-model.number="transportInputs.centerX" :placeholder="t('Tâm X (cm)')" :aria-label="t('Tâm xoay X (cm)')"
-                                class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
-                            <input type="number" step="any" v-model.number="transportInputs.centerY" :placeholder="t('Tâm Y (cm)')" :aria-label="t('Tâm xoay Y (cm)')"
-                                class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
-                            <input type="number" step="any" v-model.number="transportInputs.centerZ" :placeholder="t('Tâm Z (cm)')" :aria-label="t('Tâm xoay Z (cm)')"
-                                class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
+                        <div class="grid grid-cols-1 gap-1.5">
+                            <number-field v-for="axis in ['X', 'Y', 'Z']" :key="axis" v-model="transportInputs['center' + axis]" :prefix="axis" unit="cm" :step="1" :aria-label="t('Tâm xoay') + ' ' + axis + ' (cm)'"></number-field>
                         </div>
-                        <input type="number" step="any" v-model.number="transportInputs.angleDegrees" :placeholder="t('Góc quay quanh Z (độ, theo chiều kim đồng hồ)')" :aria-label="t('Góc quay quanh trục Z của IFC (độ, theo chiều kim đồng hồ)')"
-                            class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
+                        <number-field v-model="transportInputs.angleDegrees" unit="°" :step="1" :aria-label="t('Góc quay quanh trục Z của IFC (độ, theo chiều kim đồng hồ)')"></number-field>
+                        <p class="text-[9px] text-slate-500">{{ t('Góc quay quanh Z (độ, theo chiều kim đồng hồ)') }}</p>
                     </section>
 
                     <section class="rounded-lg border border-slate-800 bg-slate-950/40 p-3 space-y-2">
                         <h3 class="text-[11px] font-bold text-sky-300 flex items-center gap-1.5">
                             <i class="ph-bold ph-arrows-out-line-horizontal"></i> {{ t('Vector dịch chuyển') }}
                         </h3>
-                        <div class="grid grid-cols-3 gap-1.5">
-                            <input type="number" step="any" v-model.number="transportInputs.vectorX" :placeholder="t('Vector X (cm)')" :aria-label="t('Dịch chuyển X (cm)')"
-                                class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
-                            <input type="number" step="any" v-model.number="transportInputs.vectorY" :placeholder="t('Vector Y (cm)')" :aria-label="t('Dịch chuyển Y (cm)')"
-                                class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
-                            <input type="number" step="any" v-model.number="transportInputs.vectorZ" :placeholder="t('Vector Z (cm)')" :aria-label="t('Dịch chuyển Z (cm)')"
-                                class="min-w-0 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-500">
+                        <div class="grid grid-cols-1 gap-1.5">
+                            <number-field v-for="axis in ['X', 'Y', 'Z']" :key="axis" v-model="transportInputs['vector' + axis]" :prefix="axis" unit="cm" :step="1" :aria-label="t('Dịch chuyển') + ' ' + axis + ' (cm)'"></number-field>
                         </div>
                     </section>
 
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="sticky bottom-0 z-10 -mx-3 -mb-3 grid grid-cols-2 gap-2 border-t border-slate-800 bg-slate-900 px-3 py-2">
                         <button @click="openTransportProfileDialog" :disabled="isLoading"
                             class="p-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white text-[11px] font-semibold flex flex-col items-center justify-center gap-1">
                             <i class="ph-bold ph-floppy-disk text-base"></i> {{ t('Lưu profile') }}
                         </button>
-                        <button @click="applyTransport" :disabled="isLoading || sourceFiles.length === 0"
+                        <button @click="applyTransport" :disabled="isLoading" :title="sourceFiles.length === 0 ? t('Mở ít nhất một file IFC trước khi dịch chuyển.') : ''"
                             class="p-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-[11px] font-semibold flex flex-col items-center justify-center gap-1">
                             <i class="ph-bold ph-rocket-launch text-base"></i> {{ t('Dịch chuyển mô hình') }}
                         </button>
                     </div>
-                    <p class="text-[10px] leading-relaxed text-slate-500">{{ t('Tâm xoay và vector dịch tính bằng cm theo tọa độ IFC. Góc dương xoay theo chiều kim đồng hồ quanh trục Y toàn cục.') }}</p>
+                    <p class="text-[10px] leading-relaxed text-slate-500">{{ t('Tâm xoay và vector dịch tính bằng cm theo tọa độ IFC. Trục theo hệ xây dựng (Z hướng lên). Góc dương xoay theo chiều kim đồng hồ quanh trục Z.') }}</p>
 
                     <div class="grid grid-cols-2 border-b border-slate-800">
                         <button @click="transportInnerTab = 'profiles'"
@@ -828,8 +862,7 @@
                     </div>
                     <label class="block space-y-1">
                         <span class="flex items-center justify-between text-[10px] font-semibold text-slate-400"><span>{{ t('Dung sai kiểm tra') }}</span><span class="text-blue-300">mm</span></span>
-                        <input v-model.number="clashToleranceMm" type="number" min="0" max="1000" step="0.5"
-                            class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs text-slate-100 outline-none focus:border-blue-500" />
+                        <number-field v-model="clashToleranceMm" size="md" unit="mm" :min="0" :max="1000" :step="0.5"></number-field>
                         <span class="block text-[9px] leading-relaxed text-slate-500">{{ t('0 = chỉ tìm phần giao thực tế. Dung sai lớn hơn 0 sẽ nới mỗi cấu kiện một nửa giá trị để phát hiện cả khe hở nhỏ.') }}</span>
                     </label>
                     <button @click="onClashButtonClick" :disabled="!clashBusy && (isLoading || stats.meshes < 2)"
@@ -898,8 +931,8 @@
                             </span>
                         </div>
                         <div class="mt-1 font-mono text-[9px] text-slate-500">
-                            <div>P1 ({{ item.p1.map(v => v.toFixed(3)).join(', ') }})</div>
-                            <div>P2 ({{ item.p2.map(v => v.toFixed(3)).join(', ') }})</div>
+                            <div>P1 ({{ formatDimCoords(item.p1) }})</div>
+                            <div>P2 ({{ formatDimCoords(item.p2) }})</div>
                         </div>
                     </div>
                     <p v-if="!dimItems.length" class="p-5 text-center text-xs text-slate-500">{{ t('Chưa có phép đo nào. Bấm D rồi click 2 điểm trên mô hình.') }}</p>
@@ -1319,10 +1352,6 @@
                     <button @click="resetProjectInfo" :disabled="!projectInfoDirty" :title="t('Khôi phục giá trị ban đầu')"
                         class="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700">
                         <i class="ph-bold ph-arrow-counter-clockwise"></i>
-                    </button>
-                    <button @click="exportModifiedIFC" :disabled="isLoading || !wasmReady || !hasUnsavedChanges"
-                        class="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-xs font-semibold py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition">
-                        <i class="ph-bold ph-floppy-disk"></i> {{ t('Lưu file IFC') }}
                     </button>
                 </div>
             </div>

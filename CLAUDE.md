@@ -43,6 +43,14 @@ Dự án dùng **Vite** + npm (Node.js cài bản portable tại `C:\Users\Thuc.
 - **Lưu trữ**: thiết lập nhỏ theo người dùng (panel giới thiệu, độ mờ, màu nền sáng/tối, transport profile) dùng `localStorage`, bọc trong try/catch.
 - **Thư viện**: phiên bản ghim trong `package.json` (Three.js 0.160, three-mesh-bvh 0.7.8, three-bvh-csg 0.0.17, web-ifc 0.0.66, Vue 3). Đổi phiên bản có thể đổi hành vi, nên test lại.
 
+### Hệ trục tọa độ (RẤT QUAN TRỌNG)
+
+- Mọi tọa độ hiển thị/nhập cho người dùng phải theo **hệ xây dựng/IFC của dự án: X phải, Y đi vào trong, Z hướng lên trời** (đúng hệ trục đang vẽ trên View Cube), đơn vị mét, và là tọa độ dự án (không phải tọa độ scene đã căn giữa/dời gốc).
+- Scene Three.js là Y-up do web-ifc đổi trục: `three = (X, Z, -Y)` và `IFC = (x, -z, y)` (đã kiểm chứng bằng file IFC thử: đặt tại IFC (10,20,30) -> flatTransformation (10,30,-20)). Dùng `src/core/coords.js` (`ifcToThree`, `threeToIfc`, `worldToProjectCoords`), không tự hoán đổi trục ở nơi khác.
+- Tọa độ dự án = world - modelOffset + modelRebaseOrigin (chuyển trục về IFC), đã gồm transport. `modelOffset` là phép căn giữa của `modelGroup`, `modelRebaseOrigin` là gốc dời lúc nạp để tránh mất độ chính xác float32.
+- Ô nhập Transport (tâm xoay, vector dịch) nhập theo hệ IFC (cm), góc xoay quanh Z của IFC; kích thước bao ở panel thuộc tính cũng theo X, Y, Z-up. Tính năng mới có tọa độ/hướng phải tuân theo quy ước này.
+- Transport (tab dịch chuyển) áp **riêng cho từng file IFC đang mở lúc bấm**, không áp cho cả view: ma trận mỗi file lưu trong `transport.js` (`getSourceTransportMatrix`), cấu kiện của file được dời trực tiếp trong scene rồi `rebuildBatches`; file mở thêm sau đó giữ nguyên. Khi xuất IFC, ma trận của từng file được ghi vào placement gốc. Mỗi lượt dịch chuyển tính 1 thay đổi (`editHistoryCount`) và bật nút lưu IFC.
+
 ## Ghi chú
 
 - `version.md` là nhật ký thay đổi và danh sách việc cần làm của tác giả (tiếng Việt). Cập nhật khi hoàn thành tính năng.

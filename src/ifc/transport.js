@@ -2,11 +2,16 @@ import { nextTick } from 'vue';
 import * as WebIFC from 'web-ifc';
 import * as THREE from 'three';
 import { clearClashResults } from '../clash/clash.js';
+import { ifcToThree, threeToIfc } from '../core/coords.js';
 import { syncDimensionsToModelFrame } from '../dimension/dimension.js';
 import { resetCropBoxToModel } from '../scene/cropbox.js';
+import { ensureIntersectionEdges, invalidateIntersectionEdges } from '../scene/intersections.js';
+import { requestRender } from '../core/helpers.js';
+import { centerModelByBoundingBox } from './loader.js';
+import { rebuildBatches } from '../scene/rendering.js';
 import { fitCameraToModel } from '../scene/scene.js';
 import { updateSelectionOutlines } from '../selection/selection.js';
-import { clashModeActive, isCropBoxActive, rt, showTransportProfileModal, sourceFiles, transportHistory, transportInputFields, transportInputs, transportMatrix, transportOperations, transportProfileName, transportProfileNameInput, transportProfileStorageKey, transportProfiles, transportRotationAxis } from '../state/state.js';
+import { clashModeActive, deletedItems, dimModeActive, showEdges, editHistoryCount, edgesGroup, hasUnsavedChanges, isCropBoxActive, rt, showTransportProfileModal, sourceFiles, transportHistory, transportInputFields, transportInputs, transportProfileName, transportProfileNameInput, transportProfileStorageKey, transportProfiles, transportRotationAxis } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
 import { t } from '../i18n/index.js';
 
@@ -42,13 +47,36 @@ export const normalizeTransportProfile = (profile) => {
     };
 };
 
+// Profile mẫu có sẵn từ lần đầu mở web (nạp một lần, xóa đi sẽ không tự xuất hiện lại); đơn vị cm.
+// Đổi giá trị mẫu thì tăng hậu tố phiên bản của SEEDED_PROFILES_KEY để ghi đè bản đã nạp trước đó.
+const SEEDED_PROFILES_KEY = `${transportProfileStorageKey}:seeded-v2`;
+const SEED_TRANSPORT_PROFILES = [{
+    id: 'builtin-allplan-s21',
+    name: 'Allplan 👉🏻 S21',
+    centerX: 3009.245,
+    centerY: 883.618,
+    centerZ: 0,
+    angleDegrees: -292.913,
+    vectorX: 2269742.68,
+    vectorY: 2202456.38,
+    vectorZ: 0
+}];
+
 export const loadTransportProfiles = () => {
     try {
         const stored = localStorage.getItem(transportProfileStorageKey);
-        if (!stored) return;
-        const parsed = JSON.parse(stored);
+        const parsed = stored ? JSON.parse(stored) : [];
         if (!Array.isArray(parsed)) throw new Error(t('Danh sách profile đã lưu không đúng định dạng.'));
         transportProfiles.value = parsed.map(normalizeTransportProfile);
+        if (!localStorage.getItem(SEEDED_PROFILES_KEY)) {
+            const seedIds = new Set(SEED_TRANSPORT_PROFILES.map(profile => profile.id));
+            transportProfiles.value = [
+                ...transportProfiles.value.filter(profile => !seedIds.has(profile.id)),
+                ...SEED_TRANSPORT_PROFILES.map(normalizeTransportProfile)
+            ];
+            persistTransportProfiles();
+            localStorage.setItem(SEEDED_PROFILES_KEY, '1');
+        }
     } catch (error) {
         console.error('Không thể đọc profile transport từ localStorage:', error);
         showToast(t('Lỗi đọc profile'), error.message || t('Không thể đọc các profile đã lưu.'));
@@ -219,17 +247,24 @@ export const getIfcRootPlacementIds = (modelID) => {
     return roots;
 };
 
-export const applyIfcTransportToModel = (modelID, unitMeters) => {
-    if (transportOperations.length === 0) return;
+// Ma trận transport theo từng file IFC (hệ tuyệt đối của dự án, trục three). Không có = chưa dịch chuyển.
+// Dịch chuyển chỉ áp cho các file đang mở tại thời điểm bấm; file mở thêm sau đó giữ nguyên vị trí.
+const sourceTransports = new Map();
+export const getSourceTransportMatrix = (sourceId) => sourceTransports.get(sourceId) ?? null;
+export const forgetSourceTransport = (sourceId) => { sourceTransports.delete(sourceId); };
+
+export const applyIfcTransportToModel = (modelID, unitMeters, transportMatrix) => {
+    if (!transportMatrix) return;
     const roots = getIfcRootPlacementIds(modelID);
     if (roots.length === 0) throw new Error(t('Không tìm thấy IfcLocalPlacement gốc để áp dụng tọa độ transport.'));
 
     const elements = transportMatrix.elements;
-    const x = elements[12] / unitMeters;
-    const y = elements[13] / unitMeters;
-    const z = elements[14] / unitMeters;
-    const axisDirection = new THREE.Vector3(elements[8], elements[9], elements[10]).normalize();
-    const referenceDirection = new THREE.Vector3(elements[0], elements[1], elements[2]).normalize();
+    // transportMatrix ở hệ three (Y-up): đổi về hệ IFC (Z-up) trước khi ghi vào placement
+    const origin = threeToIfc(new THREE.Vector3(elements[12], elements[13], elements[14])).divideScalar(unitMeters);
+    const { x, y, z } = origin;
+    // Axis = trục Z của IFC (= trục Y của three) sau dịch chuyển, RefDirection = trục X: lấy cột tương ứng của ma trận
+    const axisDirection = threeToIfc(new THREE.Vector3(elements[4], elements[5], elements[6])).normalize();
+    const referenceDirection = threeToIfc(new THREE.Vector3(elements[0], elements[1], elements[2])).normalize();
     const writeEntity = (typeCode, attributes) => {
         const entity = rt.ifcAPI.CreateIfcEntity(modelID, typeCode);
         Object.assign(entity, attributes);
@@ -271,39 +306,60 @@ export const applyIfcTransportToModel = (modelID, unitMeters) => {
     });
 };
 
-export const getViewTransportMatrix = () => {
-    const offset = rt.modelOffset;
-    return new THREE.Matrix4()
-        .makeTranslation(offset.x, offset.y, offset.z)
-        .multiply(transportMatrix)
-        .multiply(new THREE.Matrix4().makeTranslation(-offset.x, -offset.y, -offset.z));
-};
-
+// Cập nhật các thứ phụ thuộc vị trí model sau khi căn giữa lại (dịch chuyển nằm sẵn trong ma trận từng cấu kiện)
 export const updateTransportScene = () => {
-    const viewMatrix = getViewTransportMatrix();
-    viewMatrix.decompose(rt.transportGroup.position, rt.transportGroup.quaternion, rt.transportGroup.scale);
-    rt.transportGroup.updateMatrixWorld(true);
     syncDimensionsToModelFrame();
     updateSelectionOutlines();
 };
 
-export const rebuildTransportMatrix = () => {
-    transportMatrix.identity();
-    transportOperations.forEach(operation => transportMatrix.premultiply(operation.matrix));
-    updateTransportScene();
+export const resetTransportState = () => {
+    sourceTransports.clear();
+    transportHistory.value = [];
 };
 
-export const resetTransportState = () => {
-    transportOperations.length = 0;
-    transportMatrix.identity();
-    transportHistory.value = [];
-    if (rt.transportGroup) {
-        rt.transportGroup.position.set(0, 0, 0);
-        rt.transportGroup.quaternion.identity();
-        rt.transportGroup.scale.set(1, 1, 1);
-        rt.transportGroup.updateMatrixWorld(true);
-        syncDimensionsToModelFrame();
-    }
+// Phép dịch chuyển từng lượt: id lượt -> { matrix (hệ tuyệt đối), sourceIds }, để hoàn tác
+const historyOperations = new Map();
+
+// Áp phép dịch chuyển (hệ tuyệt đối dự án, trục three) lên các file được chọn: cộng dồn vào ma trận của file
+// (dùng khi xuất IFC) và dời trực tiếp ma trận từng cấu kiện của file đó trong scene.
+const moveSources = (sourceIds, operationMatrix) => {
+    const ids = new Set(sourceIds);
+    // Scene dời gốc theo modelRebaseOrigin: ma trận trong scene = T(-R) · M · T(R)
+    const origin = rt.modelRebaseOrigin ?? new THREE.Vector3();
+    const sceneMatrix = new THREE.Matrix4()
+        .makeTranslation(-origin.x, -origin.y, -origin.z)
+        .multiply(operationMatrix)
+        .multiply(new THREE.Matrix4().makeTranslation(origin.x, origin.y, origin.z));
+
+    ids.forEach(sourceId => {
+        const next = operationMatrix.clone().multiply(sourceTransports.get(sourceId) ?? new THREE.Matrix4());
+        const isIdentity = next.elements.every((value, i) => Math.abs(value - (i % 5 === 0 ? 1 : 0)) < 1e-9);
+        if (isIdentity) sourceTransports.delete(sourceId);
+        else sourceTransports.set(sourceId, next);
+    });
+
+    rt.modelGroup.children.forEach(mesh => {
+        if (!mesh.isMesh || !ids.has(mesh.userData.sourceId)) return;
+        mesh.updateMatrix();
+        mesh.applyMatrix4(sceneMatrix);
+    });
+    // Viền cấu kiện sao chép ma trận lúc tạo nên phải cập nhật theo
+    edgesGroup.children.forEach(line => {
+        const parent = line.userData.parentMesh;
+        if (!parent || line.userData.pairMesh || !ids.has(parent.userData.sourceId)) return;
+        parent.updateMatrix();
+        line.matrix.copy(parent.matrix);
+        line.matrixWorldNeedsUpdate = true;
+    });
+    invalidateIntersectionEdges();
+    centerModelByBoundingBox();
+    rebuildBatches();
+    // Đường giao chỉ tính lại khi đang cần (hiện viền hoặc đang đo đạc)
+    if (showEdges.value || dimModeActive.value) ensureIntersectionEdges();
+    if (clashModeActive.value) clearClashResults();
+    fitCameraToModel();
+    if (isCropBoxActive.value) resetCropBoxToModel();
+    requestRender();
 };
 
 export const applyTransport = () => {
@@ -324,8 +380,9 @@ export const applyTransport = () => {
             }
         });
 
-        const center = new THREE.Vector3(values.centerX / 100, values.centerY / 100, values.centerZ / 100);
-        const movement = new THREE.Vector3(values.vectorX / 100, values.vectorY / 100, values.vectorZ / 100);
+        // Nhập theo hệ IFC (X, Y, Z-up, cm) -> đổi sang trục three (m)
+        const center = ifcToThree(values.centerX / 100, values.centerY / 100, values.centerZ / 100);
+        const movement = ifcToThree(values.vectorX / 100, values.vectorY / 100, values.vectorZ / 100);
         const rotation = new THREE.Matrix4().makeRotationAxis(
             transportRotationAxis,
             -THREE.MathUtils.degToRad(values.angleDegrees)
@@ -347,12 +404,15 @@ export const applyTransport = () => {
             timestamp: new Date().toLocaleString(),
             files: sourceFiles.value.map(source => source.name).join(', ')
         };
-        transportOperations.push({ id: entry.id, matrix: operationMatrix });
+        // Chỉ các file đang mở lúc này bị dịch chuyển; file mở thêm sau đó không bị ảnh hưởng
+        const sourceIds = sourceFiles.value.map(source => source.id);
+        historyOperations.set(entry.id, { matrix: operationMatrix, sourceIds });
+        moveSources(sourceIds, operationMatrix);
         transportHistory.value = [entry, ...transportHistory.value];
-        rebuildTransportMatrix();
-        fitCameraToModel();
-        if (isCropBoxActive.value) resetCropBoxToModel();
-        showToast(t('Dịch chuyển thành công'), t('Đã áp dụng xoay và dịch chuyển cho tất cả file IFC đang mở.'), 'success');
+        // Dịch chuyển làm thay đổi file xuất: bật nút lưu IFC và tính vào số thay đổi
+        editHistoryCount.value++;
+        hasUnsavedChanges.value = true;
+        showToast(t('Dịch chuyển thành công'), t('Đã áp dụng xoay và dịch chuyển cho các file IFC đang mở ({0} file). File mở thêm sau này không bị ảnh hưởng.', [sourceIds.length]), 'success');
     } catch (error) {
         console.error('Lỗi transport IFC:', error);
         showToast(t('Lỗi dịch chuyển'), error.message || t('Không thể áp dụng tọa độ dịch chuyển.'));
@@ -360,15 +420,17 @@ export const applyTransport = () => {
 };
 
 export const undoTransport = (entry) => {
-    const latestOperation = transportOperations[transportOperations.length - 1];
-    if (!latestOperation || latestOperation.id !== entry.id) {
+    const latest = transportHistory.value[0];
+    const operation = historyOperations.get(entry.id);
+    if (!latest || latest.id !== entry.id || !operation) {
         showToast(t('Không thể hoàn tác'), t('Chỉ có thể hoàn tác lượt dịch chuyển mới nhất.'));
         return;
     }
-    transportOperations.pop();
+    historyOperations.delete(entry.id);
     transportHistory.value = transportHistory.value.filter(item => item.id !== entry.id);
-    rebuildTransportMatrix();
-    fitCameraToModel();
-    if (isCropBoxActive.value) resetCropBoxToModel();
+    const openIds = new Set(sourceFiles.value.map(source => source.id));
+    moveSources(operation.sourceIds.filter(id => openIds.has(id)), operation.matrix.clone().invert());
+    editHistoryCount.value = Math.max(0, editHistoryCount.value - 1);
+    if (editHistoryCount.value === 0 && deletedItems.value.length === 0) hasUnsavedChanges.value = false;
     showToast(t('Đã hoàn tác dịch chuyển'), t('Đã khôi phục tọa độ trước lượt dịch chuyển gần nhất.'), 'success');
 };

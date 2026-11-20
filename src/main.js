@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { computeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 import { createApp, nextTick, onBeforeUnmount, onMounted, watch } from 'vue';
 import { clearClashResults, onClashButtonClick, runClashCheck, toggleClashPairObjects, zoomToClash } from './clash/clash.js';
-import { formatDimDistance, removeDimension, toggleDimensionMode, zoomToDimension } from './dimension/dimension.js';
+import { formatDimCoords, formatDimDistance, removeDimension, toggleDimensionMode, zoomToDimension } from './dimension/dimension.js';
 import { visibleExportItems } from './core/helpers.js';
 import { lang, t, toggleLanguage } from './i18n/index.js';
 import { exportCombineIFC, exportModifiedIFC, exportVisibleIFC } from './ifc/export.js';
@@ -22,6 +22,8 @@ import { closeContextMenu, contextMenuAction, handleContextMenuEscape, handleCon
 import { adjustPanelWidth, boxSelectionStyle, closeIntroPanel, endPanelResize, persistModelOpacity, playUiPop, startPanelResize, togglePropertiesPanel, updateModelOpacity, updatePanelResize } from './ui/panels.js';
 import { resetEditableAttributes, saveAttributeChanges } from './ui/properties.js';
 import { applyProjectInfoChanges, resetProjectInfo } from './ifc/project-info.js';
+import { NumberField } from './ui/number-field.js';
+import { initButtonStyle } from './ui/button-style.js';
 
 // Kích hoạt raycast/bounds tree tăng tốc bằng three-mesh-bvh
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -35,6 +37,7 @@ createApp({
         // --- LIFECYCLE HOOKS ---
         onMounted(async () => {
             initThreeJS();
+            initButtonStyle();
             loadTransportProfiles();
             rt.canvasResizeObserver = new ResizeObserver(() => nextTick(onWindowResize));
             if (canvasContainer.value) rt.canvasResizeObserver.observe(canvasContainer.value);
@@ -139,6 +142,7 @@ createApp({
             toggleDimensionMode,
             zoomToDimension,
             removeDimension,
+            formatDimCoords,
             formatDimDistance,
             clashModeActive,
             clashBusy,
@@ -256,4 +260,4 @@ createApp({
             handleKeyUp
         };
     }
-}).mount('#app');
+}).component('number-field', NumberField).mount('#app');

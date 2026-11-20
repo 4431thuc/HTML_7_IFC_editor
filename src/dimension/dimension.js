@@ -3,6 +3,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { requestRender } from '../core/helpers.js';
+import { worldToProjectCoords } from '../core/coords.js';
 import { ensureBoundsTree, ensureIntersectionEdges, intersectionLinesByMesh } from '../scene/intersections.js';
 import { restoreMeshMaterial } from '../scene/rendering.js';
 import { getVisibleModelIntersections } from '../selection/input.js';
@@ -718,6 +719,9 @@ export const removeDimension = (id) => {
     if (selectedDimId.value === id) selectedDimId.value = null;
     requestRender();
 };
+
+// Tọa độ dự án (hệ xây dựng X, Y, Z-up, mét) của một điểm đo world, để hiển thị trong danh sách
+export const formatDimCoords = (point) => worldToProjectCoords(new THREE.Vector3(...point)).toArray().map(v => v.toFixed(3)).join(', ');
 
 // Điểm đo lưu theo tọa độ world nên phải đi theo model khi model đổi vị trí (căn giữa lại lúc thêm/xóa file, dịch chuyển/xoay).
 // Gọi sau mỗi lần ma trận world của modelGroup có thể đã đổi: so với lần trước và áp phần chênh lên mọi điểm đo.

@@ -10,9 +10,9 @@ const MAX_PAIRS_PER_JOB = 60000;
 const SLICE_MS = 8;
 const MIN_SEGMENT_LENGTH = 1e-5;
 
-const processedPairs = new WeakMap();
+let processedPairs = new WeakMap();
 // mesh -> các LineSegments đường giao có liên quan tới mesh đó (dùng cho bắt điểm khi đo)
-export const intersectionLinesByMesh = new WeakMap();
+export let intersectionLinesByMesh = new WeakMap();
 
 const isPairProcessed = (a, b) => processedPairs.get(a)?.has(b) || processedPairs.get(b)?.has(a);
 const markPairProcessed = (a, b) => {
@@ -120,4 +120,18 @@ export const ensureIntersectionEdges = () => {
     if (signature === rt.intersectionSignature) return;
     rt.intersectionSignature = signature;
     runJob(candidates, ++rt.intersectionToken);
+};
+
+// Xóa toàn bộ đường giao đã tính và bộ nhớ đệm cặp cấu kiện (gọi khi vị trí cấu kiện đổi, ví dụ sau transport);
+// lần ensureIntersectionEdges kế tiếp sẽ tính lại từ đầu
+export const invalidateIntersectionEdges = () => {
+    edgesGroup.children.slice().forEach(line => {
+        if (!line.userData.pairMesh) return;
+        line.geometry?.dispose();
+        edgesGroup.remove(line);
+    });
+    processedPairs = new WeakMap();
+    intersectionLinesByMesh = new WeakMap();
+    rt.intersectionSignature = null;
+    rt.intersectionToken++;
 };

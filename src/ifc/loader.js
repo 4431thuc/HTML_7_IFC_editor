@@ -3,7 +3,7 @@ import { clearClashResults } from '../clash/clash.js';
 import { clearAllDimensions, syncDimensionsToModelFrame } from '../dimension/dimension.js';
 import { countLogicalObjects, createMeshKey, getMeshKey, getPsetCacheKey } from '../core/helpers.js';
 import { buildAllGroupingCollections, indexAllPropertySets, shouldMeshBeVisible, updateAllMeshesVisibility, updateEdgesVisibility } from './groups.js';
-import { getIfcLengthUnitInMeters, resetTransportState, updateTransportScene } from './transport.js';
+import { forgetSourceTransport, getIfcLengthUnitInMeters, resetTransportState, updateTransportScene } from './transport.js';
 import { resetCropBoxToModel } from '../scene/cropbox.js';
 import { rebuildBatches } from '../scene/rendering.js';
 import { getRebarColorByDiameter } from '../scene/sample-model.js';
@@ -322,6 +322,7 @@ export const removeSourceFile = (source) => {
     });
 
     removeProjectInfo(source.id);
+    forgetSourceTransport(source.id);
     sourceFiles.value = sourceFiles.value.filter(item => item.id !== source.id);
     if (rt.currentModelID === source.modelID) rt.currentModelID = sourceFiles.value[0]?.modelID ?? null;
     try {

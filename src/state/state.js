@@ -21,7 +21,7 @@ export const axisGizmoUp = new THREE.Vector3();
 export const axisGizmoBackward = new THREE.Vector3();
 export const axisGizmoAxes = [
     { direction: new THREE.Vector3(1, 0, 0), line: axisGizmoXLine, label: axisGizmoXLabel, point: axisGizmoXPoint },
-    { direction: new THREE.Vector3(0, 0, 1), line: axisGizmoYLine, label: axisGizmoYLabel, point: axisGizmoYPoint },
+    { direction: new THREE.Vector3(0, 0, -1), line: axisGizmoYLine, label: axisGizmoYLabel, point: axisGizmoYPoint },
     { direction: new THREE.Vector3(0, 1, 0), line: axisGizmoZLine, label: axisGizmoZLabel, point: axisGizmoZPoint }
 ];
 export const viewCubeEl = ref(null);
@@ -205,9 +205,7 @@ export const allGroups = reactive({
 });
 export const IDLE_RENDER_INTERVAL_MS = 200;
 export const selectionOutlines = new Map();
-export const transportMatrix = new THREE.Matrix4();
 export const transportRotationAxis = new THREE.Vector3(0, 1, 0);
-export const transportOperations = [];
 
 // BỘ 6 MẶT PHẲNG CẮT CROPBOX
 export const clippingPlanes = [

@@ -10,9 +10,10 @@ export const showPropertiesForMesh = (mesh) => {
     getObjectMeshes(mesh).forEach(member => box.union(new THREE.Box3().setFromObject(member)));
     const size = box.getSize(new THREE.Vector3());
     const dimensions = {
+        // Trục theo hệ xây dựng (Z hướng lên): X = three X, Y = three Z, Z = three Y
         x: size.x.toFixed(3),
-        y: size.y.toFixed(3),
-        z: size.z.toFixed(3)
+        y: size.z.toFixed(3),
+        z: size.y.toFixed(3)
     };
 
     const expressID = mesh.userData.expressID;

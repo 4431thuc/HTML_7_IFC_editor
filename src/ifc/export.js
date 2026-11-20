@@ -1,5 +1,5 @@
 import { getMeshKey, visibleExportItems } from '../core/helpers.js';
-import { applyIfcTransportToModel } from './transport.js';
+import { applyIfcTransportToModel, getSourceTransportMatrix } from './transport.js';
 import { applyHeaderOverrides } from './project-info.js';
 import { deletedItems, editHistoryCount, fileName, hasUnsavedChanges, isLoading, isSampleModel, loadingText, pendingDeletedExpressIDs, rt, sourceFiles } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
@@ -73,7 +73,7 @@ export const createTransportedSourceData = (source) => {
     const tempModelID = rt.ifcAPI.OpenModel(new Uint8Array(sourceData));
     if (tempModelID < 0) throw new Error(t('Không thể mở bản IFC tạm của "{0}".', [source.name]));
     try {
-        applyIfcTransportToModel(tempModelID, source.unitMeters || 1);
+        applyIfcTransportToModel(tempModelID, source.unitMeters || 1, getSourceTransportMatrix(source.id));
         const result = rt.ifcAPI.SaveModel(tempModelID);
         if (!result || result.length === 0) throw new Error(t('Dữ liệu IFC đã dịch chuyển từ "{0}" rỗng.', [source.name]));
         return result;
@@ -91,7 +91,7 @@ export const createFilteredIfcData = (mode) => {
         const tempModelID = rt.ifcAPI.OpenModel(new Uint8Array(sourceData));
         if (tempModelID < 0) throw new Error(t('Không thể mở bản IFC tạm của "{0}".', [source.name]));
         try {
-            applyIfcTransportToModel(tempModelID, source.unitMeters || 1);
+            applyIfcTransportToModel(tempModelID, source.unitMeters || 1, getSourceTransportMatrix(source.id));
             const allMeshIds = new Set();
             const visibleMeshIds = new Set();
             const sourceMeshes = rt.modelGroup.children.filter(mesh => mesh.isMesh && mesh.userData.sourceId === source.id);
