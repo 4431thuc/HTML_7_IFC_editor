@@ -402,6 +402,7 @@ export const rt = {
     dimPendingElement: null,
     dimShapeMarkers: null,
     dimSurfaceDisc: null,
+    dimEdgeHint: null,
     dimHoverMarker: null,
     intersectionToken: 0,
     intersectionSignature: '',

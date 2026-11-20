@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { clearClashResults } from '../clash/clash.js';
+import { clearAllDimensions, syncDimensionsToModelFrame } from '../dimension/dimension.js';
 import { countLogicalObjects, createMeshKey, getMeshKey, getPsetCacheKey } from '../core/helpers.js';
 import { buildAllGroupingCollections, indexAllPropertySets, shouldMeshBeVisible, updateAllMeshesVisibility, updateEdgesVisibility } from './groups.js';
 import { getIfcLengthUnitInMeters, resetTransportState, updateTransportScene } from './transport.js';
@@ -338,6 +339,7 @@ export const removeSourceFile = (source) => {
         rt.modelGroup.position.set(0, 0, 0);
         rt.modelOffset.set(0, 0, 0);
         resetTransportState();
+        syncDimensionsToModelFrame();
     } else {
         centerModelByBoundingBox();
     }
@@ -490,6 +492,7 @@ export const centerModelByBoundingBox = () => {
 
 export const clearCurrentModel = () => {
     clearClashResults();
+    clearAllDimensions();
     clearSelection();
     resetTransportState();
     rt.hoveredMesh = null;
@@ -531,6 +534,7 @@ export const clearCurrentModel = () => {
     rt.modelGroup.position.set(0, 0, 0);
     rt.modelOffset.set(0, 0, 0);
     rt.modelRebaseOrigin = null;
+    syncDimensionsToModelFrame();
     stats.meshes = 0;
     stats.rebarCount = 0;
     faultyCount.value = 0;

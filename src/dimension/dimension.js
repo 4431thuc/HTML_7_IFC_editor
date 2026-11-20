@@ -108,6 +108,10 @@ export const initDimensionMarkers = () => {
     previewLine.visible = previewLabel.visible = false;
     rt.dimPreview = { line: previewLine, label: previewLabel, mid: new THREE.Vector3() };
 
+    // Dấu gợi ý (chưa bắt) vị trí điểm vuông góc trên cạnh đang hover
+    rt.dimEdgeHint = createShapeMarker('square', HOVER_SNAP_COLOR, HOVER_RADIUS_PX * 2);
+    rt.dimEdgeHint.material.opacity = 0.6;
+
     // Các cạnh model đang được bắt điểm (1 cạnh, hoặc nhiều cạnh giao nhau tại góc): tô vàng, dày gấp đôi viền thường,
     // luôn vẽ trên cùng. Dùng LineSegments2 vì line WebGL thường không đổi được độ dày.
     const snapLine = new LineSegments2(
@@ -134,7 +138,7 @@ export const initDimensionMarkers = () => {
     disc.visible = false;
     rt.dimSurfaceDisc = disc;
 
-    dimGroup.add(previewLine, previewLabel, snapLine, disc, rt.dimHoverMarker, rt.dimPendingMarker, rt.dimShapeMarkers.square, rt.dimShapeMarkers.triangle);
+    dimGroup.add(previewLine, previewLabel, snapLine, disc, rt.dimEdgeHint, rt.dimHoverMarker, rt.dimPendingMarker, rt.dimShapeMarkers.square, rt.dimShapeMarkers.triangle);
 };
 
 // Kích thước world của 1 pixel màn hình tại vị trí position
@@ -249,6 +253,7 @@ export const updateDimensionScales = () => {
     scaleMarker(rt.dimPendingMarker);
     scaleMarker(rt.dimShapeMarkers.square);
     scaleMarker(rt.dimShapeMarkers.triangle);
+    scaleMarker(rt.dimEdgeHint);
     if (rt.dimSurfaceDisc.visible) {
         rt.dimSurfaceDisc.scale.setScalar(SURFACE_DISC_RADIUS_PX * worldUnitsPerPixel(rt.dimSurfaceDisc.position));
     }
@@ -377,7 +382,7 @@ const findCornerSnap = (candidates, mouseX, mouseY, width, height, viewProjectio
 // Thứ tự ưu tiên: (1) điểm vuông góc từ điểm đo 1 xuống cạnh (trong PERPENDICULAR_RADIUS_PX),
 // (2) góc giao của 2 cạnh trở lên, (3) điểm gần nhất trên cạnh gần con trỏ nhất.
 // rayDepth: độ sâu điểm chạm bề mặt dọc tia, dùng để loại các cạnh ở mặt khuất phía sau.
-// Trả về { point, perpendicular, segments: [[A, B], ...] } hoặc null.
+// Trả về { perpendicular, corner, nearest, nearestFoot }; nearestFoot = điểm vuông góc trên cạnh nearest (gợi ý, chưa bắt) hoặc null.
 const snapToEdges = (elements, rayDepth) => {
     const width = Math.max(rt.renderer.domElement.clientWidth, 1);
     const height = Math.max(rt.renderer.domElement.clientHeight, 1);
@@ -401,6 +406,8 @@ const snapToEdges = (elements, rayDepth) => {
     const candidates = [];
     let best = null;
     let bestPerpendicular = null;
+    // Chân đường vuông góc (world) trên cạnh gần con trỏ nhất, chỉ để hiển thị gợi ý
+    let nearestFoot = null;
 
     const isBehindSurface = (point) => {
         if (rayDepth === undefined) return false;
@@ -422,6 +429,8 @@ const snapToEdges = (elements, rayDepth) => {
             clipA.set(positions[i], positions[i + 1], positions[i + 2], 1).applyMatrix4(mvp);
             clipB.set(positions[i + 3], positions[i + 4], positions[i + 5], 1).applyMatrix4(mvp);
             if (clipA.w <= 1e-6 || clipB.w <= 1e-6) continue;
+            // hasFoot: chân đường vuông góc từ điểm đo 1 xuống đoạn này nằm trong đoạn (foot ở không gian local của đối tượng)
+            let hasFoot = false;
 
             // Điểm vuông góc từ điểm đo 1 xuống đoạn này (phải nằm trong đoạn và trong phạm vi quanh con trỏ)
             if (pending) {
@@ -433,6 +442,7 @@ const snapToEdges = (elements, rayDepth) => {
                 if (along >= 0 && along <= 1) {
                     foot.copy(localA).addScaledVector(edge, along);
                     if (foot.distanceToSquared(localPending) > 1e-12) {
+                        hasFoot = true;
                         clipFoot.set(foot.x, foot.y, foot.z, 1).applyMatrix4(mvp);
                         if (clipFoot.w > 1e-6) {
                             const footX = (clipFoot.x / clipFoot.w + 1) / 2 * width;
@@ -465,17 +475,20 @@ const snapToEdges = (elements, rayDepth) => {
             const point = segment[0].clone().lerp(segment[1], worldT);
             if (isBehindSurface(point)) continue;
             candidates.push({ distance, segment });
-            if (!best || distance < best.distance) best = { distance, point, perpendicular: false, segments: [segment] };
+            if (!best || distance < best.distance) {
+                best = { distance, point, perpendicular: false, segments: [segment] };
+                nearestFoot = hasFoot ? foot.clone().applyMatrix4(matrixWorld) : null;
+            }
         }
     });
 
     const corner = best ? findCornerSnap(candidates, mouseX, mouseY, width, height, viewProjection) : null;
-    return { perpendicular: bestPerpendicular, corner, nearest: best };
+    return { perpendicular: bestPerpendicular, corner, nearest: best, nearestFoot };
 };
 
 // Bắt điểm vuông góc tới bề mặt: điểm 2 là chân đường vuông góc hạ từ điểm đo 1 xuống mặt phẳng của mặt đang hover
 // (có thể là mặt khác của chính cấu kiện chứa điểm 1, ví dụ mặt đối diện của cột), nằm trong SURFACE_PERPENDICULAR_RADIUS_PX quanh con trỏ.
-// Trả về { point, normal } hoặc null.
+// Trả về { point, normal, snapped } hoặc null; snapped = false nghĩa là chỉ để hiển thị gợi ý (con trỏ chưa vào vùng bắt).
 const snapToSurfacePerpendicular = (element) => {
     const pending = rt.dimPendingPoint;
     const bvh = element ? ensureBoundsTree(element) : null;
@@ -500,7 +513,8 @@ const snapToSurfacePerpendicular = (element) => {
         (ndc.x - mouse.x) / 2 * width,
         (ndc.y - mouse.y) / 2 * height
     );
-    if (screenDistance > SURFACE_PERPENDICULAR_RADIUS_PX) return null;
+    // Ngoài phạm vi bắt vẫn trả về điểm để hiển thị gợi ý (snapped = false), chỉ bắt thật khi trong phạm vi
+    const snapped = screenDistance <= SURFACE_PERPENDICULAR_RADIUS_PX;
 
     // Chân đường vuông góc phải nằm trên bề mặt thật của cấu kiện (không rơi ra ngoài mép mặt)
     const originLocal = pending.clone().applyMatrix4(inverse);
@@ -512,7 +526,7 @@ const snapToSurfacePerpendicular = (element) => {
     direction.divideScalar(length);
     const rayHit = bvh.raycastFirst(new THREE.Ray(originLocal.addScaledVector(direction, startOffset), direction), THREE.DoubleSide);
     if (!rayHit || Math.abs(rayHit.distance - (length - startOffset)) > Math.max(1e-3, worldUnitsPerPixel(foot))) return null;
-    return { point: foot, normal };
+    return { point: foot, normal, snapped };
 };
 
 // Cấu kiện nằm sát con trỏ (ngoài cấu kiện đang bị chạm): thử 4 tia lệch SNAP_RADIUS_PX để lấy cả cạnh của
@@ -545,11 +559,16 @@ export const pickDimensionPoint = (intersects) => {
     const elements = probeNearbyElements();
     if (hitElement) elements.add(hitElement);
     const edge = elements.size ? snapToEdges(elements, hit.distance) : null;
-    const base = { hit, element: hitElement };
+    const surface = snapToSurfacePerpendicular(hitElement);
+    // hint: vị trí điểm vuông góc chỉ để hiển thị trước (chưa bắt) khi con trỏ chưa vào vùng bắt
+    const hint = {
+        surface: surface && !surface.snapped ? { point: surface.point, normal: surface.normal } : null,
+        edge: edge && !edge.perpendicular ? edge.nearestFoot : null
+    };
+    const base = { hit, element: hitElement, hint };
     if (edge?.perpendicular) return { ...base, point: edge.perpendicular.point, snapType: 'edge', pointShape: 'square', segments: edge.perpendicular.segments };
     if (edge?.corner) return { ...base, point: edge.corner.point, snapType: 'edge', pointShape: null, segments: edge.corner.segments };
-    const surface = snapToSurfacePerpendicular(hitElement);
-    if (surface) return { ...base, point: surface.point, snapType: 'surface-perpendicular', pointShape: 'triangle', normal: surface.normal };
+    if (surface?.snapped) return { ...base, point: surface.point, snapType: 'surface-perpendicular', pointShape: 'triangle', normal: surface.normal, hint: { ...hint, surface: null } };
     if (edge?.nearest) return { ...base, point: edge.nearest.point, snapType: 'edge', pointShape: null, segments: edge.nearest.segments };
     return { ...base, point: hit.point.clone(), snapType: 'surface', pointShape: null };
 };
@@ -594,17 +613,23 @@ export const updateDimensionHover = (intersects) => {
     if (pick?.segments) {
         snapLine.geometry.setPositions(pick.segments.flatMap(segment => segment.flatMap(point => [point.x, point.y, point.z])));
     }
-    // Bắt vuông góc tới bề mặt: vùng tròn vàng nằm trên mặt mesh quanh điểm bắt
+    // Vùng tròn vàng nằm trên mặt mesh tại điểm vuông góc tới bề mặt: đậm khi đang bắt, nhạt khi chỉ là gợi ý (chưa vào vùng bắt)
     const disc = rt.dimSurfaceDisc;
-    disc.visible = pick?.snapType === 'surface-perpendicular';
-    if (disc.visible) {
+    const discSource = pick?.snapType === 'surface-perpendicular' ? pick : pick?.hint?.surface;
+    disc.visible = !!discSource;
+    if (discSource) {
         rt.camera.updateMatrixWorld();
         // Nhấc nhẹ về phía camera để không bị z-fighting với mặt mesh
-        const toCamera = rt.camera.position.clone().sub(pick.point);
-        const lift = worldUnitsPerPixel(pick.point) * 0.25 * (pick.normal.dot(toCamera) >= 0 ? 1 : -1);
-        disc.position.copy(pick.point).addScaledVector(pick.normal, lift);
-        disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), pick.normal);
+        const toCamera = rt.camera.position.clone().sub(discSource.point);
+        const lift = worldUnitsPerPixel(discSource.point) * 0.25 * (discSource.normal.dot(toCamera) >= 0 ? 1 : -1);
+        disc.position.copy(discSource.point).addScaledVector(discSource.normal, lift);
+        disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), discSource.normal);
+        disc.material.opacity = discSource === pick ? 0.6 : 0.35;
     }
+    // Gợi ý điểm vuông góc trên cạnh đang hover (chưa bắt)
+    const edgeHint = rt.dimEdgeHint;
+    edgeHint.visible = !!pick?.hint?.edge;
+    if (edgeHint.visible) edgeHint.position.copy(pick.hint.edge);
     // Điểm 2 bắt vuông góc: dấu hình vuông / tam giác ở góc phải trên con trỏ
     Object.entries(rt.dimShapeMarkers).forEach(([shape, shapeMarker]) => {
         shapeMarker.visible = pick?.pointShape === shape;
@@ -626,6 +651,7 @@ export const clearDimensionHover = () => {
         rt.dimHoverMarker.visible = false;
         rt.dimSnapLine.visible = false;
         rt.dimSurfaceDisc.visible = false;
+        rt.dimEdgeHint.visible = false;
         Object.values(rt.dimShapeMarkers).forEach(shapeMarker => { shapeMarker.visible = false; });
         hidePreview();
         requestRender();
@@ -691,6 +717,51 @@ export const removeDimension = (id) => {
     dimItems.value = dimItems.value.filter(item => item.id !== id);
     if (selectedDimId.value === id) selectedDimId.value = null;
     requestRender();
+};
+
+// Điểm đo lưu theo tọa độ world nên phải đi theo model khi model đổi vị trí (căn giữa lại lúc thêm/xóa file, dịch chuyển/xoay).
+// Gọi sau mỗi lần ma trận world của modelGroup có thể đã đổi: so với lần trước và áp phần chênh lên mọi điểm đo.
+const lastModelFrame = new THREE.Matrix4();
+let hasModelFrame = false;
+export const syncDimensionsToModelFrame = () => {
+    if (!rt.modelGroup) return;
+    rt.modelGroup.updateWorldMatrix(true, false);
+    const frame = rt.modelGroup.matrixWorld;
+    if (!hasModelFrame) {
+        lastModelFrame.copy(frame);
+        hasModelFrame = true;
+        return;
+    }
+    if (lastModelFrame.equals(frame)) return;
+    const delta = frame.clone().multiply(lastModelFrame.clone().invert());
+    lastModelFrame.copy(frame);
+
+    dimItems.value.forEach(item => {
+        const pointA = new THREE.Vector3(...item.p1).applyMatrix4(delta);
+        const pointB = new THREE.Vector3(...item.p2).applyMatrix4(delta);
+        item.p1 = pointA.toArray();
+        item.p2 = pointB.toArray();
+        const objects = dimObjects.get(item.id);
+        if (!objects) return;
+        objects.sphereA.position.copy(pointA);
+        objects.sphereB.position.copy(pointB);
+        objects.line.geometry.setFromPoints([pointA, pointB]);
+        objects.line.geometry.computeBoundingSphere();
+        objects.mid.copy(pointA).add(pointB).multiplyScalar(0.5);
+        objects.label.position.copy(objects.mid);
+    });
+    if (rt.dimPendingPoint) {
+        rt.dimPendingPoint.applyMatrix4(delta);
+        rt.dimPendingMarker?.position.copy(rt.dimPendingPoint);
+    }
+    updateDimensionScales();
+    requestRender();
+};
+
+// Xóa toàn bộ nhóm đo và điểm đo 1 đang chờ (khi thay model: tọa độ đo thuộc model cũ)
+export const clearAllDimensions = () => {
+    cancelPendingDimension();
+    dimItems.value.map(item => item.id).forEach(removeDimension);
 };
 
 // Chọn nhóm đo trong danh sách: tô màu nổi bật và zoom vào khoảng đo, giữ hướng nhìn hiện tại

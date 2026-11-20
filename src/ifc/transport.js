@@ -2,6 +2,7 @@ import { nextTick } from 'vue';
 import * as WebIFC from 'web-ifc';
 import * as THREE from 'three';
 import { clearClashResults } from '../clash/clash.js';
+import { syncDimensionsToModelFrame } from '../dimension/dimension.js';
 import { resetCropBoxToModel } from '../scene/cropbox.js';
 import { fitCameraToModel } from '../scene/scene.js';
 import { updateSelectionOutlines } from '../selection/selection.js';
@@ -282,6 +283,7 @@ export const updateTransportScene = () => {
     const viewMatrix = getViewTransportMatrix();
     viewMatrix.decompose(rt.transportGroup.position, rt.transportGroup.quaternion, rt.transportGroup.scale);
     rt.transportGroup.updateMatrixWorld(true);
+    syncDimensionsToModelFrame();
     updateSelectionOutlines();
 };
 
@@ -300,6 +302,7 @@ export const resetTransportState = () => {
         rt.transportGroup.quaternion.identity();
         rt.transportGroup.scale.set(1, 1, 1);
         rt.transportGroup.updateMatrixWorld(true);
+        syncDimensionsToModelFrame();
     }
 };
 
