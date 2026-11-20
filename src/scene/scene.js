@@ -46,10 +46,12 @@ export const updateAxisGizmo = () => {
         cube.style.transform = `matrix3d(${r.x},${-u.x},${b.x},0,${-r.y},${u.y},${-b.y},0,${r.z},${-u.z},${b.z},0,0,0,0,1)`;
     }
 
-    // Gốc các trục đặt tại góc nhỏ nhất của khối cubic, các trục chạy dọc theo cạnh rồi nhô ra ngoài
+    // Gốc các trục đặt tại góc khối cubic mà cả 3 trục X, Y, Z (hệ xây dựng) chạy dọc theo cạnh rồi nhô ra ngoài.
+    // Trục Y xây dựng = -Z của three nên góc đó là (-x, -y, +z) trong hệ three, không phải góc nhỏ nhất.
     const half = VIEW_CUBE_HALF_UNITS;
-    const originX = 50 - half * (axisGizmoRight.x + axisGizmoRight.y + axisGizmoRight.z);
-    const originY = 50 + half * (axisGizmoUp.x + axisGizmoUp.y + axisGizmoUp.z);
+    const corner = new THREE.Vector3(-1, -1, 1);
+    const originX = 50 + half * corner.dot(axisGizmoRight);
+    const originY = 50 - half * corner.dot(axisGizmoUp);
 
     axisGizmoAxes.forEach(({ direction, line: lineRef, label: labelRef, point: pointRef }) => {
         const line = lineRef.value;

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { markRaw, toRaw } from 'vue';
-import { getMeshKey, getObjectMeshes } from '../core/helpers.js';
+import { getMeshKey, getObjectMeshes, requestRender } from '../core/helpers.js';
 import { isMeshSelected, updateSelectionDimmingEffect } from '../selection/selection.js';
-import { batchGroup, batchSlotByElement, clippingPlanes, flatMaterialCache, hoverMaterial, isCropBoxActive, isFlatShading, isWireframe, isXRayMode, overlayByElement, overlayGroup, rt, selectMaterial, selectedMeshes, xrayMaterials, xrayOpacity } from '../state/state.js';
+import { batchGroup, batchSlotByElement, clippingPlanes, selectionSlotByElement, flatMaterialCache, hoverMaterial, isCropBoxActive, isFlatShading, isWireframe, isXRayMode, overlayByElement, overlayGroup, rt, selectMaterial, selectedMeshes, xrayMaterials, xrayOpacity } from '../state/state.js';
 import { applyModelOpacityToMaterial, getModelOpacityBase } from '../ui/panels.js';
 
 // Vật liệu hiển thị của một batch theo chế độ X-ray / Flat / bình thường
@@ -44,6 +44,9 @@ export const refreshBatchMaterials = () => {
     });
 };
 
+// Cấu kiện đang chọn được vẽ trong batch chọn riêng (rebuildSelectionBatches) nên instance gốc luôn ẩn
+const isDrawnElsewhere = (element) => overlayByElement.has(element) || selectionSlotByElement.has(element);
+
 export const setBatchInstanceVisible = (element, visible) => {
     const slot = batchSlotByElement.get(element);
     if (slot) slot.batch.setVisibleAt(slot.id, visible);
@@ -53,8 +56,11 @@ export const setBatchInstanceVisible = (element, visible) => {
 export const syncBatchVisibility = () => {
     rt.batchRecords.forEach(record => {
         record.elements.forEach((element, id) => {
-            record.batch.setVisibleAt(id, element.visible && !overlayByElement.has(element));
+            record.batch.setVisibleAt(id, element.visible && !isDrawnElsewhere(element));
         });
+    });
+    rt.selectionBatches.forEach(record => {
+        record.elements.forEach((element, id) => record.batch.setVisibleAt(id, element.visible));
     });
     overlayByElement.forEach((overlay, element) => {
         overlay.visible = element.visible;
@@ -63,6 +69,8 @@ export const syncBatchVisibility = () => {
 
 // Overlay: vẽ cấu kiện được chọn/hover bằng material riêng, ẩn instance gốc trong batch
 export const setElementOverlay = (mesh, material) => {
+    // Cấu kiện đang chọn đã nằm trong batch chọn, không tạo overlay hover đè lên
+    if (selectionSlotByElement.has(mesh)) return;
     let overlay = overlayByElement.get(mesh);
     if (!overlay) {
         overlay = new THREE.Mesh(mesh.geometry, material);
@@ -81,7 +89,72 @@ export const removeElementOverlay = (mesh) => {
     if (!overlay) return;
     overlayGroup.remove(overlay);
     overlayByElement.delete(mesh);
-    setBatchInstanceVisible(mesh, mesh.visible);
+    setBatchInstanceVisible(mesh, mesh.visible && !selectionSlotByElement.has(mesh));
+};
+
+const disposeSelectionBatches = () => {
+    rt.selectionBatches.forEach(record => {
+        overlayGroup.remove(record.batch);
+        record.batch.dispose();
+    });
+    rt.selectionBatches = [];
+    selectionSlotByElement.clear();
+};
+
+// Vẽ toàn bộ cấu kiện đang chọn bằng vài BatchedMesh dùng selectMaterial (nhóm theo bộ thuộc tính hình học),
+// thay vì mỗi cấu kiện một mesh overlay: chọn hàng nghìn cấu kiện vẫn chỉ thêm vài lệnh vẽ, xoay không bị lag.
+// selected: Set các mesh (raw) đang chọn.
+export const rebuildSelectionBatches = (selected) => {
+    const previous = Array.from(selectionSlotByElement.keys());
+    disposeSelectionBatches();
+    previous.forEach(element => {
+        if (!selected.has(element)) setBatchInstanceVisible(element, element.visible && !overlayByElement.has(element));
+    });
+
+    const groups = new Map();
+    selected.forEach(element => {
+        if (!element?.isMesh || !element.geometry?.attributes?.position || !element.parent) return;
+        const attrNames = Object.keys(element.geometry.attributes).sort().join(',');
+        if (!groups.has(attrNames)) groups.set(attrNames, []);
+        groups.get(attrNames).push(element);
+    });
+
+    groups.forEach(elements => {
+        let vertexCount = 0;
+        let indexCount = 0;
+        elements.forEach(element => {
+            const geo = element.geometry;
+            if (!geo.index) geo.setIndex(Array.from({ length: geo.attributes.position.count }, (_, i) => i));
+            vertexCount += geo.attributes.position.count;
+            indexCount += geo.index.count;
+        });
+        const batch = new THREE.BatchedMesh(elements.length, vertexCount, indexCount, selectMaterial);
+        batch.frustumCulled = false;
+        // Sắp xếp từng cấu kiện theo khoảng cách khi trong suốt, giống các mesh overlay riêng trước đây
+        batch.sortObjects = true;
+        const record = { batch, elements: [], isSelection: true };
+        batch.userData.record = record;
+        elements.forEach(element => {
+            const id = batch.addGeometry(element.geometry);
+            element.updateMatrix();
+            batch.setMatrixAt(id, element.matrix);
+            batch.setVisibleAt(id, element.visible);
+            record.elements[id] = element;
+            selectionSlotByElement.set(element, { batch, id });
+            // Overlay hover (nếu có) của cấu kiện vừa được chọn không còn cần
+            const overlay = overlayByElement.get(element);
+            if (overlay) {
+                overlayGroup.remove(overlay);
+                overlayByElement.delete(element);
+            }
+            setBatchInstanceVisible(element, false);
+        });
+        batch.computeBoundingBox();
+        batch.computeBoundingSphere();
+        overlayGroup.add(batch);
+        rt.selectionBatches.push(record);
+    });
+    requestRender();
 };
 
 export const restoreMeshMaterial = (mesh) => {
@@ -105,6 +178,7 @@ export const applyHoverMaterial = (mesh) => {
 export const rebuildBatches = () => {
     overlayByElement.forEach(overlay => overlayGroup.remove(overlay));
     overlayByElement.clear();
+    disposeSelectionBatches();
     rt.batchRecords.forEach(record => {
         batchGroup.remove(record.batch);
         record.batch.dispose();

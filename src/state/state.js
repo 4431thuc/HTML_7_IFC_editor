@@ -277,6 +277,8 @@ export const clashOutlineMaterial = new THREE.LineBasicMaterial({
     depthTest: true, depthWrite: false, toneMapped: false
 });
 export const batchSlotByElement = new WeakMap();
+// Cấu kiện đang chọn -> { batch, id } trong batch chọn
+export const selectionSlotByElement = new Map();
 export const overlayByElement = new Map();
 export const edgeCropUniforms = {
     cropActive: { value: false },
@@ -404,6 +406,9 @@ export const rt = {
     cropDragStartValue: 0,
     cropDragPixelToWorld: 0,
     batchRecords: [],
+    // Batch vẽ các cấu kiện đang chọn (rendering.js rebuildSelectionBatches) và đường viền chọn gộp (selection.js)
+    selectionBatches: [],
+    selectionOutline: null,
     meshesByKey: new Map(),
     sourceFileSequence: 0,
     pointerDownPos: { x: 0, y: 0 },

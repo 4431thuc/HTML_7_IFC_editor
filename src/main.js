@@ -67,11 +67,11 @@ createApp({
             window.removeEventListener('keydown', handleContextMenuEscape);
             if (rt.renderer) rt.renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
             if (rt.renderer) rt.renderer.dispose();
-            selectionOutlines.forEach(entry => {
-                if (rt.scene) rt.scene.remove(entry.outline);
-                entry.outline.geometry.dispose();
-            });
-            selectionOutlines.clear();
+            if (rt.selectionOutline) {
+                if (rt.scene) rt.scene.remove(rt.selectionOutline);
+                rt.selectionOutline.geometry.dispose();
+                rt.selectionOutline = null;
+            }
             selectionOutlineMaterial.dispose();
         });
 

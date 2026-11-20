@@ -1,19 +1,34 @@
-import { nextTick, toRaw } from 'vue';
+import { computed, nextTick, toRaw } from 'vue';
 import * as THREE from 'three';
 import { getMeshKey, getObjectMeshes, requestRender } from '../core/helpers.js';
 import { filteredGroups } from '../ifc/groups.js';
-import { applyHoverMaterial, restoreMeshMaterial, setElementOverlay } from '../scene/rendering.js';
+import { applyHoverMaterial, rebuildSelectionBatches, removeElementOverlay, restoreMeshMaterial } from '../scene/rendering.js';
 import { fitCameraToSelectedObjects } from '../scene/scene.js';
-import { allGroups, clippingPlanes, groupCriterion, groupListContainer, groupSearchQuery, hoveredType, isCropBoxActive, isEditingAttributes, leftActiveTab, manuallyHiddenExpressIDs, pendingDeletedExpressIDs, rt, selectMaterial, selectedMeshes, selectedObject, selectionOutlineMaterial, selectionOutlines, showLeftPanel, showRightPanel } from '../state/state.js';
+import { allGroups, clippingPlanes, groupCriterion, groupListContainer, groupSearchQuery, hoveredType, isCropBoxActive, isEditingAttributes, leftActiveTab, manuallyHiddenExpressIDs, pendingDeletedExpressIDs, rt, overlayByElement, selectMaterial, selectedMeshes, selectedObject, selectionOutlineMaterial, showLeftPanel, showRightPanel } from '../state/state.js';
 import { applyModelOpacityToMaterial, playUiPop, showToast } from '../ui/panels.js';
 import { showPropertiesForMesh } from '../ui/properties.js';
 import { t } from '../i18n/index.js';
 
 // --- 7. HIGHLIGHT ĐỐI TƯỢNG VÀ KHUNG VIỀN VÙNG CHỌN ---
 
-export const isMeshSelected = (mesh) => {
-    const rawMesh = toRaw(mesh);
-    return selectedMeshes.value.some(selected => toRaw(selected) === rawMesh);
+// Tập cấu kiện đang chọn (tính lại một lần mỗi khi selectedMeshes đổi) để kiểm tra "đã chọn" là O(1).
+// Khi thêm nhiều cấu kiện cùng lúc, gán selectedMeshes một lần thay vì push từng cái (mỗi push làm tính lại tập).
+export const selectedMeshSet = computed(() => new Set(selectedMeshes.value.map(toRaw)));
+
+export const isMeshSelected = (mesh) => selectedMeshSet.value.has(toRaw(mesh));
+
+// Thêm các mesh vào vùng chọn (không trùng) bằng một lần gán
+export const addToSelection = (meshes) => {
+    const current = selectedMeshSet.value;
+    const additions = [];
+    const seen = new Set();
+    meshes.forEach(mesh => {
+        const raw = toRaw(mesh);
+        if (current.has(raw) || seen.has(raw)) return;
+        seen.add(raw);
+        additions.push(raw);
+    });
+    if (additions.length) selectedMeshes.value = [...selectedMeshes.value, ...additions];
 };
 
 export const isMeshManuallyHidden = (mesh) => manuallyHiddenExpressIDs.has(getMeshKey(toRaw(mesh)));
@@ -21,68 +36,84 @@ export const isMeshManuallyHidden = (mesh) => manuallyHiddenExpressIDs.has(getMe
 // Cấu kiện đã đưa vào danh sách xóa: mờ, không chọn/hover/zoom được trong nhóm
 export const isMeshPendingRemoval = (mesh) => pendingDeletedExpressIDs.has(getMeshKey(toRaw(mesh)));
 
-export const updateSelectionOutlines = () => {
-    if (!rt.scene) return;
-    const selected = new Set(selectedMeshes.value.map(toRaw));
-    selectionOutlines.forEach((entry, mesh) => {
-        if (selected.has(mesh) && mesh.parent) return;
-        rt.scene.remove(entry.outline);
-        entry.outline.geometry.dispose();
-        selectionOutlines.delete(mesh);
-    });
-
-    selected.forEach(mesh => {
-        if (!mesh?.isMesh || !mesh.geometry) return;
-        mesh.updateWorldMatrix(true, false);
-        const matrixKey = mesh.matrixWorld.elements.map(value => value.toPrecision(10)).join(',');
-        const existing = selectionOutlines.get(mesh);
-        if (existing && existing.matrixKey === matrixKey) {
-            existing.outline.visible = mesh.visible;
-            return;
-        }
-
-        if (existing) {
-            rt.scene.remove(existing.outline);
-            existing.outline.geometry.dispose();
-        }
-        const geometry = new THREE.EdgesGeometry(mesh.geometry, 15);
-        geometry.applyMatrix4(mesh.matrixWorld);
-        const outline = new THREE.LineSegments(geometry, selectionOutlineMaterial);
-        outline.computeLineDistances();
-        outline.renderOrder = 1001;
-        outline.frustumCulled = false;
-        outline.visible = mesh.visible;
-        rt.scene.add(outline);
-        selectionOutlines.set(mesh, { outline, matrixKey });
-    });
+// Cạnh (EdgesGeometry) theo không gian local của từng hình học, tính một lần rồi dùng lại
+const localEdgesCache = new WeakMap();
+const getLocalEdges = (geometry) => {
+    let positions = localEdgesCache.get(geometry);
+    if (!positions) {
+        const edges = new THREE.EdgesGeometry(geometry, 15);
+        positions = edges.attributes.position.array.slice();
+        edges.dispose();
+        localEdgesCache.set(geometry, positions);
+    }
+    return positions;
 };
 
-export const updateSelectionDimmingEffect = (incremental = false) => {
-    requestRender();
-    const selected = new Set(selectedMeshes.value.map(toRaw));
+// Viền nét đứt của toàn bộ cấu kiện đang chọn gộp thành MỘT LineSegments (một lệnh vẽ),
+// dựng lại mỗi khi vùng chọn / hiển thị / vị trí thay đổi
+export const updateSelectionOutlines = () => {
+    if (!rt.scene) return;
+    const meshes = [];
+    let floatCount = 0;
+    selectedMeshSet.value.forEach(mesh => {
+        if (!mesh?.isMesh || !mesh.geometry || !mesh.parent || !mesh.visible) return;
+        const edges = getLocalEdges(mesh.geometry);
+        meshes.push({ mesh, edges });
+        floatCount += edges.length;
+    });
 
-    updateSelectionOutlines();
-    const applyMeshSelectionState = (mesh) => {
-        if (!mesh.isMesh) return;
-        if (selected.has(mesh)) {
-            applyModelOpacityToMaterial(selectMaterial);
-            const planes = isCropBoxActive.value ? clippingPlanes : null;
-            if (selectMaterial.clippingPlanes !== planes) {
-                selectMaterial.clippingPlanes = planes;
-                selectMaterial.needsUpdate = true;
-            }
-            setElementOverlay(mesh, selectMaterial);
-        } else {
-            restoreMeshMaterial(mesh);
-        }
-    };
-
-    // Chế độ incremental chỉ xử lý mesh vừa chọn/bỏ chọn, tránh quét O(n) mỗi lần click
-    if (incremental) {
-        new Set([...rt.lastSelectedMeshes, ...selected]).forEach(applyMeshSelectionState);
-    } else {
-        rt.modelGroup.children.forEach(applyMeshSelectionState);
+    let outline = rt.selectionOutline;
+    if (floatCount === 0) {
+        if (outline) outline.visible = false;
+        requestRender();
+        return;
     }
+    const merged = new Float32Array(floatCount);
+    const point = new THREE.Vector3();
+    let offset = 0;
+    meshes.forEach(({ mesh, edges }) => {
+        mesh.updateWorldMatrix(true, false);
+        const matrix = mesh.matrixWorld;
+        for (let i = 0; i < edges.length; i += 3) {
+            point.set(edges[i], edges[i + 1], edges[i + 2]).applyMatrix4(matrix);
+            merged[offset++] = point.x;
+            merged[offset++] = point.y;
+            merged[offset++] = point.z;
+        }
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(merged, 3));
+    if (!outline) {
+        outline = new THREE.LineSegments(geometry, selectionOutlineMaterial);
+        outline.renderOrder = 1001;
+        outline.frustumCulled = false;
+        rt.scene.add(outline);
+        rt.selectionOutline = outline;
+    } else {
+        outline.geometry.dispose();
+        outline.geometry = geometry;
+    }
+    outline.computeLineDistances();
+    outline.visible = true;
+    requestRender();
+};
+
+export const updateSelectionDimmingEffect = () => {
+    requestRender();
+    const selected = selectedMeshSet.value;
+    // Material chọn theo trạng thái hiện tại (độ mờ model, CropBox)
+    applyModelOpacityToMaterial(selectMaterial);
+    const planes = isCropBoxActive.value ? clippingPlanes : null;
+    if (selectMaterial.clippingPlanes !== planes) {
+        selectMaterial.clippingPlanes = planes;
+        selectMaterial.needsUpdate = true;
+    }
+    // Bỏ overlay hover còn sót của cấu kiện không chọn (chỉ duyệt overlay đang có, không quét cả model)
+    Array.from(overlayByElement.keys()).forEach(mesh => {
+        if (!selected.has(mesh)) removeElementOverlay(mesh);
+    });
+    rebuildSelectionBatches(selected);
+    updateSelectionOutlines();
     rt.lastSelectedMeshes = selected;
 };
 
@@ -112,11 +143,7 @@ export const onGroupMouseLeave = (grp) => {
 
 export const selectGroupMeshes = (grp) => {
     const meshes = grp.meshes.filter(mesh => !isMeshPendingRemoval(mesh));
-    meshes.forEach(mesh => {
-        if (!isMeshSelected(mesh)) {
-            selectedMeshes.value.push(toRaw(mesh));
-        }
-    });
+    addToSelection(meshes);
     updateSelectionDimmingEffect();
     if (meshes.length > 0) {
         showPropertiesForMesh(meshes[0]);
@@ -175,12 +202,10 @@ export const handleMeshSelection = (mesh, isMultiSelect = false) => {
             showRightPanel.value = false;
         }
     } else {
-        objectMeshes.forEach(member => {
-            if (!isMeshSelected(member)) selectedMeshes.value.push(member);
-        });
+        addToSelection(objectMeshes);
         showPropertiesForMesh(mesh);
     }
-    updateSelectionDimmingEffect(true);
+    updateSelectionDimmingEffect();
     showRightPanel.value = true;
 };
 
@@ -214,5 +239,5 @@ export const clearSelection = () => {
     selectedObject.value = null;
     isEditingAttributes.value = false;
     showRightPanel.value = false;
-    updateSelectionDimmingEffect(true);
+    updateSelectionDimmingEffect();
 };

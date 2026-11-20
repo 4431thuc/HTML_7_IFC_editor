@@ -6,8 +6,8 @@ import { cancelPendingDimension, clearDimensionHover, handleDimensionClick, togg
 import { toggleXRayMode } from '../scene/display.js';
 import { fitCameraToVisibleModel, resetOrbitPivotTracking } from '../scene/scene.js';
 import { applyHoverMaterial, restoreMeshMaterial, syncBatchVisibility } from '../scene/rendering.js';
-import { clearSelection, handleMeshSelection, isMeshSelected, resolveHitElement, revealMeshInGroups, updateSelectionDimmingEffect } from './selection.js';
-import { boxEnd, boxStart, clashModeActive, cropBounds, cropGroup, dimModeActive, handleMeshes, hoveredType, isBoxSelecting, isCropBoxActive, isLoading, isShiftPressed, leftActiveTab, mouse, overlayByElement, pendingDeletedExpressIDs, raycaster, rt, selectedMeshes, showRightPanel } from '../state/state.js';
+import { addToSelection, clearSelection, handleMeshSelection, isMeshSelected, resolveHitElement, revealMeshInGroups, updateSelectionDimmingEffect } from './selection.js';
+import { boxEnd, boxStart, clashModeActive, cropBounds, cropGroup, dimModeActive, handleMeshes, hoveredType, isBoxSelecting, isCropBoxActive, isLoading, isShiftPressed, leftActiveTab, mouse, overlayByElement, overlayGroup, pendingDeletedExpressIDs, raycaster, rt, selectedMeshes, showRightPanel } from '../state/state.js';
 import { showPropertiesForMesh } from '../ui/properties.js';
 import { t } from '../i18n/index.js';
 
@@ -40,6 +40,8 @@ export const getVisibleModelIntersections = () => {
     syncBatchVisibility();
     const pickables = rt.batchRecords.map(record => record.batch);
     overlayByElement.forEach(overlay => { if (overlay.visible) pickables.push(overlay); });
+    // Batch chọn chỉ pick được khi đang hiện (overlayGroup bị ẩn lúc xem clash)
+    if (overlayGroup.visible) rt.selectionBatches.forEach(record => pickables.push(record.batch));
     return raycaster.intersectObjects(pickables, false)
         .filter(hit => isPointInsideCropBounds(hit.point));
 };
@@ -289,6 +291,7 @@ export const performBoxSelection = (start, end, isCtrl) => {
         new THREE.Matrix4().multiplyMatrices(rt.camera.projectionMatrix, rt.camera.matrixWorldInverse)
     );
     const visibleMeshes = rt.modelGroup.children.filter(m => m.isMesh && m.visible);
+    const boxSelected = [];
 
     visibleMeshes.forEach(mesh => {
         const box = new THREE.Box3().setFromObject(mesh);
@@ -334,12 +337,11 @@ export const performBoxSelection = (start, end, isCtrl) => {
         const intersectsSelection = screenMaxX >= minX && screenMinX <= maxX &&
             screenMaxY >= minY && screenMinY <= maxY;
         if (!(isContainmentSelection ? fullyContained : intersectsSelection)) return;
-        getObjectMeshes(mesh).forEach(member => {
-            if (!isMeshSelected(member)) selectedMeshes.value.push(member);
-        });
+        boxSelected.push(...getObjectMeshes(mesh));
     });
 
-    updateSelectionDimmingEffect(true);
+    addToSelection(boxSelected);
+    updateSelectionDimmingEffect();
 
     if (selectedMeshes.value.length > 0) {
         showPropertiesForMesh(selectedMeshes.value[selectedMeshes.value.length - 1]);

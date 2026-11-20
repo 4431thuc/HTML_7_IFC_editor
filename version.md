@@ -1,5 +1,7 @@
 ## 20.11.2026
 - sửa giá trị thuộc tính Pset: chuột phải vào thuộc tính trong Property Sets > Sửa giá trị, áp cho các cấu kiện đang chọn; Pset/thuộc tính dùng chung với cấu kiện không chọn thì tách bản sao (pset + IfcRelDefinesByProperties mới) để cấu kiện khác giữ giá trị cũ; cập nhật Pos/đường kính suy ra từ Pset (nhóm, màu thép), bộ đếm lưu IFC; code ở src/ifc/pset-edit.js
+- "Chỉ hiện tương tự" ẩn/hiện qua manuallyHiddenExpressIDs: bộ đếm Ẩn, hàng mờ trong nhóm đồng bộ
+- tối ưu chọn nhiều cấu kiện: kiểm tra đã chọn bằng Set (selectedMeshSet), cấu kiện đang chọn vẽ bằng vài BatchedMesh (rebuildSelectionBatches) thay vì mỗi cấu kiện một overlay, viền chọn gộp thành 1 LineSegments, cạnh local được cache theo geometry
 
 ## 19.11.2026
 - thêm file IFC (tab Gộp, kéo thả) trùng tên file đang mở: hiện hộp thoại hỏi có mở tiếp không

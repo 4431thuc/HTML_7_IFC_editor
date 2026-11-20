@@ -961,7 +961,7 @@
             
             <div v-show="isBoxSelecting" class="selectBoxOverlay" :style="boxSelectionStyle"></div>
             <!-- VIEW CUBE: khối cubic đồng bộ với camera, bấm mặt/cạnh/góc để đổi hướng nhìn -->
-            <div :style="{ right: `${(showRightPanel ? rightPanelWidth : 0) + 12}px` }"
+            <div :style="{ left: `${(showLeftPanel ? leftPanelWidth : 0) + 12}px` }"
                 class="vc-wrap absolute top-3 z-20 select-none"
                 :class="isLightBackground ? 'vc-light' : 'vc-dark'">
                 <div class="vc-scene">
@@ -1008,7 +1008,7 @@
             </div>
 
             <!-- Hướng dẫn ban đầu -->
-            <div v-if="!hasLoadedIfc && !isLoading && !isSampleModel" :style="{ left: `${(showLeftPanel ? leftPanelWidth : 0) + 16}px` }"
+            <div v-if="!hasLoadedIfc && !isLoading && !isSampleModel" :style="{ left: `${(showLeftPanel ? leftPanelWidth : 0) + 144}px` }"
                 class="absolute top-4 z-10 max-w-sm backdrop-blur-md border rounded-xl p-4 shadow-2xl"
                 :class="isLightBackground ? 'bg-white/90 border-slate-300 text-slate-800' : 'bg-slate-900/90 border-slate-700/80 text-white'">
                 <div class="flex items-start gap-3">

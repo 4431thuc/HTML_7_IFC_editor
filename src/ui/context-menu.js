@@ -65,12 +65,7 @@ export const contextMenuAction = (action) => {
     };
 
     if (action === 'selectSimilar') {
-        selectedMeshes.value = [];
-        rt.modelGroup.children.forEach(mesh => {
-            if (mesh.isMesh && isMatch(mesh)) {
-                selectedMeshes.value.push(mesh);
-            }
-        });
+        selectedMeshes.value = rt.modelGroup.children.filter(mesh => mesh.isMesh && isMatch(mesh));
         updateSelectionDimmingEffect();
         // showToast('Select Similar', `Đã chọn ${selectedMeshes.value.length} đối tượng có cùng ${contextMenu.attrKey} = "${contextMenu.attrValue}"`, 'success');
     } else if (action === 'showSimilar') {
