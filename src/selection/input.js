@@ -287,57 +287,139 @@ export const performBoxSelection = (start, end, isCtrl) => {
     }
 
     rt.camera.updateMatrixWorld();
-    const frustum = new THREE.Frustum().setFromProjectionMatrix(
-        new THREE.Matrix4().multiplyMatrices(rt.camera.projectionMatrix, rt.camera.matrixWorldInverse)
-    );
-    const visibleMeshes = rt.modelGroup.children.filter(m => m.isMesh && m.visible);
-    const boxSelected = [];
+    const viewProjection = new THREE.Matrix4().multiplyMatrices(rt.camera.projectionMatrix, rt.camera.matrixWorldInverse);
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(viewProjection);
+    const toScreenX = (ndcX) => rect.left + ((ndcX + 1) * rect.width) / 2;
+    const toScreenY = (ndcY) => rect.top + ((1 - ndcY) * rect.height) / 2;
+    const insideRect = (x, y) => x >= minX && x <= maxX && y >= minY && y <= maxY;
 
-    visibleMeshes.forEach(mesh => {
-        const box = new THREE.Box3().setFromObject(mesh);
-        if (box.isEmpty() || !frustum.intersectsBox(box)) return;
-        if (isCropBoxActive.value && (
-            box.min.x < cropBounds.minX || box.max.x > cropBounds.maxX ||
-            box.min.y < cropBounds.minY || box.max.y > cropBounds.maxY ||
-            box.min.z < cropBounds.minZ || box.max.z > cropBounds.maxZ
-        )) return;
+    // Gom theo cấu kiện logic (một cấu kiện có thể gồm nhiều mesh)
+    const objects = new Map();
+    rt.modelGroup.children.forEach(mesh => {
+        if (!mesh.isMesh || !mesh.visible || !mesh.geometry?.attributes?.position) return;
+        const key = getMeshKey(mesh);
+        if (!objects.has(key)) objects.set(key, []);
+        objects.get(key).push(mesh);
+    });
 
-        const corners = [
-            new THREE.Vector3(box.min.x, box.min.y, box.min.z),
-            new THREE.Vector3(box.min.x, box.min.y, box.max.z),
-            new THREE.Vector3(box.min.x, box.max.y, box.min.z),
-            new THREE.Vector3(box.min.x, box.max.y, box.max.z),
-            new THREE.Vector3(box.max.x, box.min.y, box.min.z),
-            new THREE.Vector3(box.max.x, box.min.y, box.max.z),
-            new THREE.Vector3(box.max.x, box.max.y, box.min.z),
-            new THREE.Vector3(box.max.x, box.max.y, box.max.z)
-        ];
-        let screenMinX = Infinity;
-        let screenMaxX = -Infinity;
-        let screenMinY = Infinity;
-        let screenMaxY = -Infinity;
-        let allCornersInViewDepth = true;
-        let allCornersInSelection = true;
-
-        corners.forEach(corner => {
-            corner.project(rt.camera);
-            const screenX = rect.left + ((corner.x + 1) * rect.width) / 2;
-            const screenY = rect.top + ((1 - corner.y) * rect.height) / 2;
-            screenMinX = Math.min(screenMinX, screenX);
-            screenMaxX = Math.max(screenMaxX, screenX);
-            screenMinY = Math.min(screenMinY, screenY);
-            screenMaxY = Math.max(screenMaxY, screenY);
-            if (corner.z < -1 || corner.z > 1) allCornersInViewDepth = false;
-            if (screenX < minX || screenX > maxX || screenY < minY || screenY > maxY) {
-                allCornersInSelection = false;
+    // Chiếu đỉnh thật của hình học lên màn hình (không dùng hộp bao: hộp bao của thanh thép xiên rất lớn,
+    // làm quét chéo chọn nhầm và quét gọn bỏ sót). behind = đỉnh nằm sau camera / ngoài độ sâu nhìn thấy.
+    const projectMesh = (mesh) => {
+        mesh.updateWorldMatrix(true, false);
+        const e = new THREE.Matrix4().multiplyMatrices(viewProjection, mesh.matrixWorld).elements;
+        const positions = mesh.geometry.attributes.position.array;
+        const count = positions.length / 3;
+        const xs = new Float32Array(count);
+        const ys = new Float32Array(count);
+        const behind = new Uint8Array(count);
+        for (let i = 0; i < count; i++) {
+            const x = positions[i * 3];
+            const y = positions[i * 3 + 1];
+            const z = positions[i * 3 + 2];
+            const w = e[3] * x + e[7] * y + e[11] * z + e[15];
+            if (w <= 1e-9) {
+                behind[i] = 1;
+                continue;
             }
-        });
+            const ndcZ = (e[2] * x + e[6] * y + e[10] * z + e[14]) / w;
+            if (ndcZ < -1 || ndcZ > 1) behind[i] = 1;
+            xs[i] = toScreenX((e[0] * x + e[4] * y + e[8] * z + e[12]) / w);
+            ys[i] = toScreenY((e[1] * x + e[5] * y + e[9] * z + e[13]) / w);
+        }
+        return { xs, ys, behind, count, index: mesh.geometry.index?.array ?? null };
+    };
 
-        const fullyContained = allCornersInViewDepth && allCornersInSelection;
-        const intersectsSelection = screenMaxX >= minX && screenMinX <= maxX &&
-            screenMaxY >= minY && screenMinY <= maxY;
-        if (!(isContainmentSelection ? fullyContained : intersectsSelection)) return;
-        boxSelected.push(...getObjectMeshes(mesh));
+    // Hai đoạn thẳng cắt nhau (trên màn hình)
+    const segmentsCross = (ax, ay, bx, by, cx, cy, dx, dy) => {
+        const d1 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx);
+        const d2 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx);
+        const d3 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+        const d4 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax);
+        return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+    };
+    const rectEdges = [[minX, minY, maxX, minY], [maxX, minY, maxX, maxY], [maxX, maxY, minX, maxY], [minX, maxY, minX, minY]];
+    const segmentHitsRect = (ax, ay, bx, by) => insideRect(ax, ay) || insideRect(bx, by)
+        || rectEdges.some(([cx, cy, dx, dy]) => segmentsCross(ax, ay, bx, by, cx, cy, dx, dy));
+    const pointInTriangle = (px, py, ax, ay, bx, by, cx, cy) => {
+        const s1 = (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+        const s2 = (cx - bx) * (py - by) - (cy - by) * (px - bx);
+        const s3 = (ax - cx) * (py - cy) - (ay - cy) * (px - cx);
+        return (s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0);
+    };
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // Quét từ trái sang phải: mọi đỉnh của cấu kiện phải nằm gọn trong vùng chọn
+    const meshContained = (mesh) => {
+        const { xs, ys, behind, count } = projectMesh(mesh);
+        for (let i = 0; i < count; i++) {
+            if (behind[i] || !insideRect(xs[i], ys[i])) return false;
+        }
+        return true;
+    };
+    // Quét từ phải sang trái: chỉ cần một phần hình (đỉnh, cạnh tam giác) chạm vùng chọn,
+    // hoặc vùng chọn nằm trong một tam giác
+    const meshCrosses = (mesh) => {
+        const { xs, ys, behind, count, index } = projectMesh(mesh);
+        for (let i = 0; i < count; i++) {
+            if (!behind[i] && insideRect(xs[i], ys[i])) return true;
+        }
+        const triangleCount = Math.floor((index ? index.length : count) / 3);
+        for (let tri = 0; tri < triangleCount; tri++) {
+            const a = index ? index[tri * 3] : tri * 3;
+            const b = index ? index[tri * 3 + 1] : tri * 3 + 1;
+            const c = index ? index[tri * 3 + 2] : tri * 3 + 2;
+            if (behind[a] || behind[b] || behind[c]) continue;
+            if (segmentHitsRect(xs[a], ys[a], xs[b], ys[b]) || segmentHitsRect(xs[b], ys[b], xs[c], ys[c])
+                || segmentHitsRect(xs[c], ys[c], xs[a], ys[a])
+                || pointInTriangle(centerX, centerY, xs[a], ys[a], xs[b], ys[b], xs[c], ys[c])) return true;
+        }
+        return false;
+    };
+
+    // Hộp bao của mesh chiếu lên màn hình: chỉ dùng để loại nhanh trước khi xét từng đỉnh
+    const screenBoxOf = (box) => {
+        let sMinX = Infinity; let sMaxX = -Infinity; let sMinY = Infinity; let sMaxY = -Infinity;
+        let allInDepth = true;
+        const corner = new THREE.Vector3();
+        for (let k = 0; k < 8; k++) {
+            corner.set(k & 1 ? box.max.x : box.min.x, k & 2 ? box.max.y : box.min.y, k & 4 ? box.max.z : box.min.z).applyMatrix4(viewProjection);
+            if (corner.z < -1 || corner.z > 1) allInDepth = false;
+            const x = toScreenX(corner.x);
+            const y = toScreenY(corner.y);
+            sMinX = Math.min(sMinX, x); sMaxX = Math.max(sMaxX, x);
+            sMinY = Math.min(sMinY, y); sMaxY = Math.max(sMaxY, y);
+        }
+        return { sMinX, sMaxX, sMinY, sMaxY, allInDepth };
+    };
+    const missesRect = (sb) => sb.sMaxX < minX || sb.sMinX > maxX || sb.sMaxY < minY || sb.sMinY > maxY;
+
+    const boxSelected = [];
+    objects.forEach(meshes => {
+        const candidates = [];
+        for (const mesh of meshes) {
+            const box = new THREE.Box3().setFromObject(mesh);
+            if (box.isEmpty()) continue;
+            // Giữ quy tắc cũ: khi bật CropBox, cấu kiện phải nằm trọn trong hộp cắt
+            if (isCropBoxActive.value && (
+                box.min.x < cropBounds.minX || box.max.x > cropBounds.maxX ||
+                box.min.y < cropBounds.minY || box.max.y > cropBounds.maxY ||
+                box.min.z < cropBounds.minZ || box.max.z > cropBounds.maxZ
+            )) return;
+            candidates.push({ mesh, box });
+        }
+        if (candidates.length === 0) return;
+
+        const selected = isContainmentSelection
+            ? candidates.every(({ mesh, box }) => {
+                const sb = screenBoxOf(box);
+                if (missesRect(sb)) return false;
+                // Hộp bao đã nằm gọn thì chắc chắn gọn, khỏi xét từng đỉnh
+                if (sb.allInDepth && sb.sMinX >= minX && sb.sMaxX <= maxX && sb.sMinY >= minY && sb.sMaxY <= maxY) return true;
+                return meshContained(mesh);
+            })
+            : candidates.some(({ mesh, box }) => frustum.intersectsBox(box) && !missesRect(screenBoxOf(box)) && meshCrosses(mesh));
+        if (selected) boxSelected.push(...meshes);
     });
 
     addToSelection(boxSelected);
