@@ -1,4 +1,10 @@
 ## 20.11.2026
+- hệ trục: mọi tọa độ hiển thị/nhập theo hệ xây dựng X, Y, Z hướng lên (khớp View Cube), đơn vị mét, tọa độ dự án; scene three là Y-up (three = X, Z, -Y), quy đổi tập trung ở src/core/coords.js; sửa trục Y của gizmo View Cube, kích thước bao ở panel thuộc tính theo X, Y, Z-up
+- đo đạc: tọa độ P1/P2 hiển thị theo tọa độ dự án; khi chọn điểm 2, rê lên mặt là hiện sẵn vùng tròn gợi ý tại chân vuông góc, rê lên cạnh là hiện ô vuông gợi ý điểm vuông góc (chưa bắt, phạm vi bắt vẫn 7px); mở file thay thế thì xóa các đo cũ; đo đi theo model khi model được căn giữa lại
+- transport: áp riêng cho các file đang mở lúc bấm (file mở thêm sau giữ nguyên vị trí), xoay quanh Z qua tâm trước rồi mới dịch theo vector; ô nhập theo hệ IFC (cm, độ), mỗi ô có nhãn trục và đơn vị, xếp 3 dòng; dòng nhắc thứ tự ở đầu tab; mỗi lượt tính 1 thay đổi, bật nút lưu IFC; sửa lỗi lưu IFC sai trục (thép đứng dọc khi mở lại); nút dịch chuyển ghim ở đáy panel; profile mẫu "Allplan 👉🏻 S21"
+- panel thuộc tính và panel thông tin dự án hiện tọa độ (tâm, min, max) theo hệ dự án; bỏ nút Lưu IFC trùng trong panel thông tin dự án
+- giao diện: ô nhập số dùng component number-field (nút tăng/giảm cùng phong cách web); nút kiểu 3D (viền đáy đậm theo màu nút, chữ in hoa) qua src/ui/button-style.js; View Cube + trục chuyển sang góc trên trái view, trục nằm đúng cạnh khối
+- chọn bằng khung kéo xét đỉnh/tam giác thật thay vì hộp bao (thép xiên không còn bị chọn nhầm hoặc bỏ sót)
 - sửa giá trị thuộc tính Pset: chuột phải vào thuộc tính trong Property Sets > Sửa giá trị, áp cho các cấu kiện đang chọn; Pset/thuộc tính dùng chung với cấu kiện không chọn thì tách bản sao (pset + IfcRelDefinesByProperties mới) để cấu kiện khác giữ giá trị cũ; cập nhật Pos/đường kính suy ra từ Pset (nhóm, màu thép), bộ đếm lưu IFC; code ở src/ifc/pset-edit.js
 - "Chỉ hiện tương tự" ẩn/hiện qua manuallyHiddenExpressIDs: bộ đếm Ẩn, hàng mờ trong nhóm đồng bộ
 - tối ưu chọn nhiều cấu kiện: kiểm tra đã chọn bằng Set (selectedMeshSet), cấu kiện đang chọn vẽ bằng vài BatchedMesh (rebuildSelectionBatches) thay vì mỗi cấu kiện một overlay, viền chọn gộp thành 1 LineSegments, cạnh local được cache theo geometry
@@ -23,6 +29,7 @@
 - check clash
 
 ## chưa làm
+- Pset gắn qua kiểu cấu kiện (IfcTypeObject.HasPropertySets) chưa đọc/sửa được
 - xoay cropbox
 - restore all trong mục remove
 - thêm tùy chọn để làm 1 tour hướng dẫn từng chức năng trong web

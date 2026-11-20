@@ -13,7 +13,7 @@ Dự án dùng **Vite** + npm (Node.js cài bản portable tại `C:\Users\Thuc.
 - `npm install`: cài thư viện (thư mục `node_modules/` nằm trong `.gitignore`).
 - `npm run dev`: chạy dev server (mặc định `http://localhost:5173`). **Không mở `index.html` trực tiếp bằng `file://`** vì module ES bị trình duyệt chặn.
 - `npm run build`: build production vào `dist/` (cũng là cách nhanh để bắt lỗi import/export thiếu).
-- Không có linter hay bộ test tự động. Kiểm tra thủ công trên trình duyệt: nạp model mẫu `32R-08290-BW31-P1-_.ifc` (thư mục gốc), thử chọn cấu kiện, CropBox, Clash, Đo đạc (phím D), Chia tách (tab `export`), và xem console có lỗi không. Có thể tự động hóa bằng `puppeteer-core` + Chrome cài sẵn (chạy `npx vite --port 5199`; sau khi sửa file nguồn phải khởi động lại vite vì module nạp lại có `?t=` thành bản sao khác; import module qua `import('/src/state/state.js')` trong `page.evaluate` để đọc state); không thêm vào dự án.
+- Không có linter hay bộ test tự động. Kiểm tra thủ công trên trình duyệt: nạp model mẫu `32R-08290-BW31-P1-_.ifc` (thư mục gốc), thử chọn cấu kiện, CropBox, Clash, Đo đạc (phím D), Chia tách (tab `export`), và xem console có lỗi không. Có thể tự động hóa bằng `puppeteer-core` (hiện chưa cài trong máy, cần người dùng cho phép cài tạm) + Chrome cài sẵn (chạy `npx vite --port 5199`; sau khi sửa file nguồn phải khởi động lại vite vì module nạp lại có `?t=` thành bản sao khác; import module qua `import('/src/state/state.js')` trong `page.evaluate` để đọc state); không thêm vào dự án.
 - Tailwind, icon Phosphor, font Inter và Google Analytics vẫn tải từ CDN trong `index.html`, nên cần internet khi chạy. WASM của web-ifc cũng tải từ jsDelivr (`ifcAPI.SetWasmPath` trong `src/scene/scene.js`).
 
 ## Kiến trúc
@@ -24,14 +24,15 @@ Dự án dùng **Vite** + npm (Node.js cài bản portable tại `C:\Users\Thuc.
 - `src/state/state.js`: toàn bộ state dùng chung (ref, reactive, Map, material, group Three.js). Các biến trước đây là `let` có thể gán lại nằm trong object **`rt`** (ví dụ `rt.scene`, `rt.camera`, `rt.ifcAPI`, `rt.needsRender`); luôn đọc/ghi qua `rt.xxx`, không tạo biến module để gán lại.
 - Logic chia theo chủ đề, các module import trực tiếp lẫn nhau (có vòng import giữa các module hàm là bình thường vì chỉ dùng lúc gọi, không dùng lúc nạp module):
   - `src/core/helpers.js`: `requestRender`, khóa mesh (`createMeshKey`...).
-  - `src/scene/`: `scene.js` (init web-ifc/Three.js, camera, ánh sáng, fit camera), `cropbox.js`, `display.js` (X-Ray, wireframe, edges...), `rendering.js` (batch và overlay vật liệu), `sample-model.js`.
-  - `src/ifc/`: `loader.js` (nạp IFC, tạo mesh), `groups.js` (nhóm, hiển thị, remove/restore), `transport.js` (dịch/xoay model và profile), `export.js` (xuất, gộp IFC).
+  - `src/core/coords.js`: quy đổi hệ trục scene <-> hệ dự án (xem mục Hệ trục tọa độ).
+  - `src/scene/`: `scene.js` (init web-ifc/Three.js, camera, ánh sáng, fit camera), `cropbox.js`, `display.js` (X-Ray, wireframe, edges...), `rendering.js` (batch, overlay hover, batch chọn `rebuildSelectionBatches`), `sample-model.js`.
+  - `src/ifc/`: `loader.js` (nạp IFC, tạo mesh), `groups.js` (nhóm, hiển thị, remove/restore), `transport.js` (dịch/xoay từng file và profile), `export.js` (xuất, gộp IFC), `pset-edit.js` (sửa giá trị thuộc tính Pset, chuột phải > Sửa giá trị).
   - `src/clash/clash.js`: kiểm tra va chạm (three-bvh-csg).
   - `src/dimension/dimension.js`: đo đạc (phím D). `pickDimensionPoint` là nơi duy nhất quyết định điểm pick/bắt điểm (cạnh, góc giao, vuông góc cạnh, vuông góc bề mặt); hover và click đều dùng nó, thêm kiểu bắt điểm mới (đỉnh...) ở đây. Điểm đo lưu theo tọa độ world (mét), kích thước quả cầu/nhãn tính theo pixel (`worldUnitsPerPixel`). Viền được bắt dùng `LineSegments2` (line WebGL thường không đổi được độ dày).
   - `src/ifc/project-info.js`: thông tin cấp dự án (header, IfcProject/Site/Building/Storey, OwnerHistory, địa chỉ) hiển thị và sửa ở panel phải khi chưa chọn cấu kiện. Thực thể ghi lại bằng `GetLine` → sửa → `WriteLine`; **header ghi bằng hậu xử lý text** (`applyHeaderOverrides`, gọi trong `downloadIfcData`) vì web-ifc 0.0.66 không có SetHeaderLine. web-ifc nhân đôi/hỏng chuỗi có dấu nháy đơn và gạch chéo ngược qua các lần lưu - mở lại nên `sanitizeIfcText` thay các ký tự đó trước khi ghi. State: `projectInfos`, `projectInfoSourceId`, `projectHeaderOverrides` trong `state.js`.
   - `src/scene/intersections.js`: đường giao giữa các cấu kiện (bvhcast), tính nền theo lát 8ms, lưu trong `edgesGroup` với `userData.parentMesh/pairMesh`; dùng cho hiển thị viền và bắt điểm. Cấu kiện chưa có BVH (mô hình mẫu) được tạo qua `ensureBoundsTree`.
-  - `src/selection/`: `selection.js` (chọn, outline, dimming), `input.js` (pointer, box select, phím).
-  - `src/ui/`: `panels.js` (panel, toast, độ mờ), `properties.js` (thuộc tính, sửa attribute), `context-menu.js`.
+  - `src/selection/`: `selection.js` (chọn, outline, dimming), `input.js` (pointer, box select theo đỉnh/tam giác thật, phím).
+  - `src/ui/`: `panels.js` (panel, toast, độ mờ), `properties.js` (thuộc tính, sửa attribute), `context-menu.js`, `coords-info.js` (tọa độ tâm/min/max ở panel thuộc tính và thông tin dự án), `number-field.js` (component `<number-field>` cho mọi ô nhập số, đăng ký trong `main.js`), `button-style.js` (style nút 3D: gắn `data-btn3d` và màu viền `--btn-edge` theo màu nền thật của nút, CSS trong `index.html`).
 
 ### Các ý tưởng xuyên suốt
 
@@ -41,6 +42,9 @@ Dự án dùng **Vite** + npm (Node.js cài bản portable tại `C:\Users\Thuc.
 - **Chế độ và thanh trạng thái**: `statusIndicator` (computed trong `state.js`) quyết định chữ/màu nút tròn ở thanh trạng thái theo chế độ (nạp WASM, đo đạc, clash). Thêm chế độ mới thì thêm nhánh vào đó và thêm bản dịch EN.
 - **Phím tắt**: nằm trong `handleKeyDown` (`input.js`), đã bỏ qua khi đang gõ trong input/textarea/select. Hiện có C (CropBox), X (X-Ray), D (đo đạc), Space, Delete, Esc (hủy điểm đo 1).
 - **Lưu trữ**: thiết lập nhỏ theo người dùng (panel giới thiệu, độ mờ, màu nền sáng/tối, transport profile) dùng `localStorage`, bọc trong try/catch.
+- **Vùng chọn**: `selectedMeshSet` (computed Set) để kiểm tra đã chọn O(1); thêm nhiều cấu kiện thì dùng `addToSelection` (gán một lần, đừng `push` từng cái). Cấu kiện đang chọn được vẽ bằng vài `BatchedMesh` (`rt.selectionBatches`), viền chọn là một `LineSegments` (`rt.selectionOutline`); đừng quay lại kiểu mỗi cấu kiện một overlay/viền vì xoay sẽ lag.
+- **Ẩn/hiện**: luôn qua `manuallyHiddenExpressIDs` rồi `updateAllMeshesVisibility()`, không gán thẳng `mesh.visible` (bộ đếm Ẩn, danh sách nhóm sẽ lệch).
+- **Bộ đếm lưu IFC**: thay đổi nào ghi vào IFC (attribute, Pset, transport, thông tin dự án) phải tăng `editHistoryCount` và đặt `hasUnsavedChanges`.
 - **Thư viện**: phiên bản ghim trong `package.json` (Three.js 0.160, three-mesh-bvh 0.7.8, three-bvh-csg 0.0.17, web-ifc 0.0.66, Vue 3). Đổi phiên bản có thể đổi hành vi, nên test lại.
 
 ### Hệ trục tọa độ (RẤT QUAN TRỌNG)

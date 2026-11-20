@@ -9,17 +9,18 @@
 | Nhóm | Chức năng | Giá trị mang lại |
 |---|---|---|
 | Xem 3D | Render theo yêu cầu, batch hình học, X-Ray, wireframe, viền cạnh, độ mờ mô hình | Mô hình lớn (hàng chục MB) vẫn mượt |
-| Điều hướng | **ViewCube** 26 hướng (6 mặt, 12 cạnh, 8 góc) đồng bộ với camera, trục X/Y/Z, Persp/Ortho | Chuyển hướng nhìn một chạm, nhấp đúp nút giữa để zoom toàn bộ |
+| Điều hướng | **ViewCube** 26 hướng (6 mặt, 12 cạnh, 8 góc) ở góc trên trái view, đồng bộ với camera, trục X/Y/Z (Z hướng lên), Persp/Ortho | Chuyển hướng nhìn một chạm, nhấp đúp nút giữa để zoom toàn bộ |
 | CropBox | Cắt lát 6 mặt độc lập, kéo bằng mũi tên 3D | Soi bên trong cấu kiện, tập trung vùng quan tâm |
-| **Đo đạc** | Đo khoảng cách 2 điểm (phím D), tự bắt điểm vào cạnh, góc giao, vuông góc với cạnh / bề mặt, xem trước khi di chuột | Đo nhanh trên model, kể cả đường giao giữa các cấu kiện |
+| **Đo đạc** | Đo khoảng cách 2 điểm (phím D), tự bắt điểm vào cạnh, góc giao, vuông góc với cạnh / bề mặt, gợi ý trước vị trí điểm vuông góc, tọa độ điểm theo hệ dự án | Đo nhanh trên model, kể cả đường giao giữa các cấu kiện |
 | **Clash** | Kiểm tra xung đột giữa các loại cấu kiện (A/B), dung sai mm, zoom tới cặp va chạm | Phát hiện thép đụng thép, thép đụng cột/dầm/sàn |
-| Chỉnh sửa | Sửa Name, ObjectType, Tag, Description rồi lưu thành IFC mới | Chuẩn hóa dữ liệu trước khi bàn giao |
+| Chỉnh sửa | Sửa Name, ObjectType, Tag, Description; **sửa giá trị thuộc tính Pset** (chuột phải > Sửa giá trị) cho các cấu kiện đang chọn; lưu thành IFC mới | Chuẩn hóa dữ liệu trước khi bàn giao |
 | **Thông tin dự án** | Mở file là panel phải hiện header file, IfcProject, IfcSite, IfcBuilding, IfcBuildingStorey, người / tổ chức / ứng dụng xuất IFC, địa chỉ; sửa được và lưu vào IFC mới | Chuẩn hóa tên dự án, tòa, khu, tác giả trước khi bàn giao |
 | Remove / Restore | Đánh dấu xóa cấu kiện (phím Delete ở mọi tab), khôi phục, xuất IFC đã loại bỏ | Dọn mô hình mà không mất bản gốc |
 | Phân nhóm | Theo Pos thép, Name, ObjectType, IFC Type; lọc, ẩn/hiện, chọn cả nhóm | Quản lý hàng nghìn cấu kiện dễ dàng |
 | Thép | Tô màu theo đường kính Ø, nhận diện thanh lỗi, lọc chỉ-thép | Đọc bản vẽ thép trực quan |
+| Tọa độ | Panel thuộc tính và panel thông tin dự án hiện tọa độ tâm/min/max theo hệ dự án (X, Y, Z-up, mét) | Kiểm tra vị trí cấu kiện, mô hình sau khi dịch chuyển |
 | Combine | Gộp nhiều file IFC trong cùng một view, mỗi file là một "source" riêng | Ghép mô hình kiến trúc – kết cấu – MEP |
-| Transport | Dịch/xoay mô hình theo tọa độ, lưu profile | Căn chỉnh nhiều mô hình về cùng gốc tọa độ |
+| Transport | Xoay quanh Z rồi dịch theo vector cho **các file đang mở**, lưu vào IFC xuất ra, lưu profile | Đưa mô hình thép từ gốc 0,0,0 về tọa độ công trường rồi mở thêm model công trường để đối chiếu |
 | Chia tách / Xuất file | Lưu bản chỉnh sửa, **chia tách** (tab Chia tách: xuất riêng phần đang hiển thị), xuất combine | Đúng thứ bạn cần, không thừa dữ liệu |
 
 ## Luồng làm việc
@@ -71,16 +72,35 @@ Ngay khi nạp xong một file IFC, panel phải tự mở và hiển thị **th
 | Địa chỉ | AddressLines, Town, Region, PostalCode, Country... (nếu site / tòa có địa chỉ) |
 | Người, tổ chức, ứng dụng xuất IFC | IfcPerson, IfcOrganization, IfcApplication lấy từ OwnerHistory |
 
-Sửa xong bấm **Áp dụng vào IFC** (ghi vào mô hình đang mở), rồi **Lưu file IFC** để tạo file mới. Mở nhiều file thì chọn file ở ô trên cùng của panel. Chọn một cấu kiện thì panel chuyển sang thuộc tính cấu kiện; bấm nút panel ở header để mở lại thông tin dự án.
+Sửa xong bấm **Áp dụng vào IFC** (ghi vào mô hình đang mở), rồi bấm **Lưu file IFC** trên header để tạo file mới. Panel cũng hiện tọa độ bao (tâm, min, max) của cả file theo hệ dự án. Mở nhiều file thì chọn file ở ô trên cùng của panel. Chọn một cấu kiện thì panel chuyển sang thuộc tính cấu kiện; bấm nút panel ở header để mở lại thông tin dự án.
 
 Lưu ý: dấu nháy đơn và gạch chéo ngược trong giá trị sửa được thay bằng ’ và / vì web-ifc làm hỏng các ký tự này khi lưu.
+
+## Hệ trục tọa độ
+
+Mọi tọa độ hiển thị và nhập trong web (điểm đo, tọa độ cấu kiện, kích thước bao, ô Transport) theo **hệ xây dựng của dự án IFC**: X sang phải, Y đi vào trong, **Z hướng lên trời**, đúng hệ trục vẽ trên View Cube. Tọa độ là tọa độ dự án (không phải tọa độ view đã căn giữa), đơn vị mét (ô Transport nhập cm).
+
+## Sửa giá trị thuộc tính Pset
+
+Chọn một hoặc nhiều cấu kiện, chuột phải vào một thuộc tính trong khung **Property Sets** > **Sửa giá trị**, nhập giá trị mới (giữ đúng kiểu: văn bản, số, số nguyên, đúng/sai) rồi **Áp dụng**.
+
+- Chỉ các cấu kiện đang chọn có thuộc tính đó bị đổi. Pset dùng chung với cấu kiện khác được tách bản sao, nên cấu kiện không chọn giữ giá trị cũ.
+- Giá trị mới cập nhật ở panel thuộc tính, chọn/hiện tương tự, lọc, nhóm Pos và màu thép (nếu thuộc tính là Pos/đường kính), và tăng bộ đếm của nút **Lưu file IFC**.
+- Chỉ sửa được thuộc tính đơn giá trị (IfcPropertySingleValue) đang có giá trị.
+
+## Transport (dịch chuyển)
+
+- Áp cho **các file IFC đang mở lúc bấm**; file mở thêm sau đó giữ nguyên vị trí, nên có thể đưa mô hình thép về tọa độ công trường rồi mở model công trường để đối chiếu.
+- Thứ tự cố định: **xoay quanh trục Z qua tâm xoay trước, sau đó dịch theo vector**. Tâm và vector nhập theo hệ dự án (cm), góc theo độ (dương là theo chiều kim đồng hồ).
+- Mỗi lượt dịch chuyển tăng bộ đếm thay đổi; **Lưu file IFC** ghi vị trí mới vào file xuất. Có hoàn tác lượt mới nhất và lưu/nhập profile (có sẵn profile mẫu "Allplan 👉🏻 S21").
 
 ## Đo đạc (Dimension)
 
 Bấm **D** (không kích hoạt khi đang gõ trong ô nhập) để bật/tắt chế độ đo; tab **Đo đạc** ở panel trái liệt kê các phép đo.
 
 - Click chuột trái để chọn điểm 1, click lần 2 để chọn điểm 2. Có đường nối cùng nhãn khoảng cách (cm; từ 1 m trở lên hiển thị m) và 2 quả cầu tự giữ cỡ khi zoom. Esc hủy điểm 1.
-- Sau khi chọn điểm 1, đường nối và nhãn chạy theo chuột (xem trước).
+- Sau khi chọn điểm 1, đường nối và nhãn chạy theo chuột (xem trước). Rê lên một mặt thì vùng tròn gợi ý hiện sẵn tại chân đường vuông góc; rê lên một cạnh thì ô vuông nhỏ gợi ý điểm vuông góc trên cạnh đó. Đưa chuột vào gợi ý (7px) mới bắt điểm.
+- Danh sách đo hiện tọa độ P1, P2 theo hệ dự án.
 - Khi hover, điểm pick tự **bắt điểm** trong 7px màn hình (quả cầu xanh đậm, cạnh được bắt tô vàng, dày gấp đôi), theo thứ tự ưu tiên:
 
 | Ưu tiên | Kiểu bắt | Dấu hiệu |
@@ -105,11 +125,12 @@ flowchart TB
         UI[Vue 3 - index.html và main.js]
         State[state.js - ref/reactive và rt]
         subgraph Logic[Module chức năng]
-            IFC[ifc: loader, groups, transport, export]
+            IFC[ifc: loader, groups, transport, export, project-info, pset-edit]
             Scene[scene: Three.js, cropbox, display, rendering]
             Sel[selection: chọn, input]
             Clash[clash: kiểm tra va chạm]
             Dim[dimension: đo đạc, bắt điểm]
+            Coords[core/coords: hệ trục dự án]
         end
         WASM[web-ifc WASM]
     end
@@ -120,6 +141,8 @@ flowchart TB
     Sel --> Scene
     Clash --> Scene
     Dim --> Scene
+    Dim --> Coords
+    IFC --> Coords
 ```
 
 ## Thao tác nhanh
@@ -130,14 +153,14 @@ flowchart TB
 | Chuột giữa (kéo) | Pan |
 | **Nhấp đúp chuột giữa** | Zoom toàn bộ cấu kiện đang hiển thị |
 | Chuột phải | Dịch view |
-| Shift + kéo | Chọn theo vùng (kéo sang phải: chọn trọn, sang trái: chọn chạm) |
+| Shift + kéo | Chọn theo vùng theo hình thật của cấu kiện (kéo sang phải: chọn cấu kiện nằm trọn, sang trái: chọn cấu kiện chạm vùng) |
 | Ctrl + click | Chọn thêm / bỏ chọn |
 | Delete | Đưa cấu kiện đang chọn vào danh sách xóa (mọi tab) |
 | Space | Ẩn / hiện cấu kiện đang chọn |
 | C | Bật / tắt CropBox |
 | D | Bật / tắt chế độ đo đạc |
 | X | Bật / tắt X-Ray |
-| Chuột phải vào thuộc tính | Menu Select / Show similar, lọc theo giá trị |
+| Chuột phải vào thuộc tính | Menu Sửa giá trị (thuộc tính Pset), Chọn / Chỉ hiện tương tự, lọc theo giá trị |
 
 Thanh trạng thái phía dưới còn có thanh **độ mờ mô hình**, nút ☀️/🌚 đổi nền sáng/tối và nút **Persp/Ortho**.
 
@@ -160,4 +183,5 @@ Vite · Vue 3 · Three.js 0.160 · web-ifc 0.0.66 · three-mesh-bvh · three-bvh
 - Xoay CropBox
 - Đo đạc nâng cao: bắt đỉnh, ghi dim vào IFC
 - Restore all trong mục Remove
+- Đọc/sửa Pset gắn qua kiểu cấu kiện (IfcTypeObject)
 - Thông tin khối lượng và các công cụ QC chuyên biệt
