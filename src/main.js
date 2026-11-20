@@ -24,6 +24,10 @@ import { resetEditableAttributes, saveAttributeChanges } from './ui/properties.j
 import { applyProjectInfoChanges, resetProjectInfo } from './ifc/project-info.js';
 import { NumberField } from './ui/number-field.js';
 import { initButtonStyle } from './ui/button-style.js';
+import { applyPsetEdit } from './ifc/pset-edit.js';
+import { psetEditDialog } from './state/state.js';
+import { getSelectedCoords, getSourceCoords } from './ui/coords-info.js';
+import { coordVersion } from './state/state.js';
 
 // Kích hoạt raycast/bounds tree tăng tốc bằng three-mesh-bvh
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -143,6 +147,11 @@ createApp({
             zoomToDimension,
             removeDimension,
             formatDimCoords,
+            applyPsetEdit,
+            psetEditDialog,
+            coordVersion,
+            getSelectedCoords,
+            getSourceCoords,
             formatDimDistance,
             clashModeActive,
             clashBusy,

@@ -1,17 +1,21 @@
-import { getPsetCacheKey } from '../core/helpers.js';
-import { updateEdgesVisibility } from '../ifc/groups.js';
+import { getMeshKey, getPsetCacheKey } from '../core/helpers.js';
+import { openPsetEditDialog } from '../ifc/pset-edit.js';
+import { updateAllMeshesVisibility } from '../ifc/groups.js';
 import { updateSelectionDimmingEffect } from '../selection/selection.js';
-import { contextMenu, groupSearchQuery, leftActiveTab, psetCache, rt, selectedMeshes } from '../state/state.js';
+import { contextMenu, groupSearchQuery, leftActiveTab, manuallyHiddenExpressIDs, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes } from '../state/state.js';
 import { showToast } from './panels.js';
 import { t } from '../i18n/index.js';
 
 // --- 8. CONTEXT MENU ---
-export const openContextMenu = (event, key, val) => {
+// psetName / editable: chỉ có khi chuột phải vào một thuộc tính trong Property Sets (để hiện mục "Sửa giá trị")
+export const openContextMenu = (event, key, val, psetName = '', editable = false) => {
     contextMenu.visible = true;
     contextMenu.x = Math.min(event.clientX, window.innerWidth - 230);
-    contextMenu.y = Math.min(event.clientY, window.innerHeight - 150);
+    contextMenu.y = Math.min(event.clientY, window.innerHeight - 190);
     contextMenu.attrKey = key;
     contextMenu.attrValue = String(val);
+    contextMenu.psetName = psetName;
+    contextMenu.editable = !!editable;
 };
 
 export const closeContextMenu = () => {
@@ -33,6 +37,11 @@ export const contextMenuAction = (action) => {
     const key = contextMenu.attrKey.toLowerCase();
     const val = contextMenu.attrValue.toLowerCase();
     closeContextMenu();
+
+    if (action === 'editValue') {
+        openPsetEditDialog(contextMenu.psetName, contextMenu.attrKey, contextMenu.attrValue);
+        return;
+    }
 
     const isMatch = (mesh) => {
         const ud = mesh.userData;
@@ -65,15 +74,20 @@ export const contextMenuAction = (action) => {
         updateSelectionDimmingEffect();
         // showToast('Select Similar', `Đã chọn ${selectedMeshes.value.length} đối tượng có cùng ${contextMenu.attrKey} = "${contextMenu.attrValue}"`, 'success');
     } else if (action === 'showSimilar') {
+        // Ẩn/hiện qua manuallyHiddenExpressIDs (nguồn sự thật duy nhất) để bộ đếm "Ẩn" ở thanh status,
+        // trạng thái mờ trong danh sách nhóm và nút mắt của nhóm đều đồng bộ
         let count = 0;
         rt.modelGroup.children.forEach(mesh => {
-            if (mesh.isMesh) {
-                const match = isMatch(mesh);
-                mesh.visible = match;
-                if (match) count++;
+            if (!mesh.isMesh) return;
+            const key = getMeshKey(mesh);
+            if (isMatch(mesh)) {
+                manuallyHiddenExpressIDs.delete(key);
+                count++;
+            } else if (!pendingDeletedExpressIDs.has(key)) {
+                manuallyHiddenExpressIDs.add(key);
             }
         });
-        updateEdgesVisibility();
+        updateAllMeshesVisibility();
         // showToast('Show Similar', `Đang chỉ hiển thị ${count} đối tượng tương tự`, 'success');
     } else if (action === 'filterWithAttribute') {
         leftActiveTab.value = 'groups';

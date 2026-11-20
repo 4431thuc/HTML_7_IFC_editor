@@ -227,7 +227,7 @@ const splitLines = (text) => text.split(/\r?\n/).map(line => line.trim()).filter
 
 // web-ifc không bỏ dấu escape khi đọc lại chuỗi có dấu nháy đơn / gạch chéo ngược, nên qua các lần lưu - mở file xuất
 // chuỗi sẽ bị nhân đôi hoặc làm hỏng file. Thay bằng ký tự tương đương an toàn trước khi ghi vào thực thể IFC.
-const sanitizeIfcText = (text) => text.split("'").join('’').split(String.fromCharCode(92)).join('/');
+export const sanitizeIfcText = (text) => text.split("'").join('’').split(String.fromCharCode(92)).join('/');
 
 const toIfcAttribute = (field, original) => {
     const text = sanitizeIfcText(field.value);

@@ -1,3 +1,6 @@
+## 20.11.2026
+- sửa giá trị thuộc tính Pset: chuột phải vào thuộc tính trong Property Sets > Sửa giá trị, áp cho các cấu kiện đang chọn; Pset/thuộc tính dùng chung với cấu kiện không chọn thì tách bản sao (pset + IfcRelDefinesByProperties mới) để cấu kiện khác giữ giá trị cũ; cập nhật Pos/đường kính suy ra từ Pset (nhóm, màu thép), bộ đếm lưu IFC; code ở src/ifc/pset-edit.js
+
 ## 19.11.2026
 - thêm file IFC (tab Gộp, kéo thả) trùng tên file đang mở: hiện hộp thoại hỏi có mở tiếp không
 - panel phải hiển thị và sửa thông tin cấp dự án của file IFC vừa mở (header, project, site, building, storey, người/ứng dụng xuất IFC, địa chỉ), lưu vào IFC mới; code ở src/ifc/project-info.js (header ghi bằng hậu xử lý text khi xuất)

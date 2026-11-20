@@ -25,6 +25,8 @@ export const indexAllPropertySets = (modelID, sourceId) => {
 
                 const psetName = psetLine.Name?.value || 'PropertySet';
                 const properties = [];
+                // propId / psetId / relId: id thực thể IFC để sửa giá trị Pset (src/ifc/pset-edit.js);
+                // editable = IfcPropertySingleValue có NominalValue (chỉ loại này sửa được)
 
                 if (psetLine.HasProperties) {
                     for (const propRef of psetLine.HasProperties) {
@@ -35,7 +37,10 @@ export const indexAllPropertySets = (modelID, sourceId) => {
                                 if (val === undefined || val === null) val = prop.Description?.value || '—';
                                 properties.push({
                                     name: prop.Name.value,
-                                    value: typeof val === 'object' ? JSON.stringify(val) : String(val)
+                                    value: typeof val === 'object' ? JSON.stringify(val) : String(val),
+                                    propId: propRef.value,
+                                    editable: prop.NominalValue !== null && prop.NominalValue !== undefined
+                                        && rt.ifcAPI.GetLineType(modelID, propRef.value) === WebIFC.IFCPROPERTYSINGLEVALUE
                                 });
                             }
                         } catch (e) {}
@@ -46,7 +51,7 @@ export const indexAllPropertySets = (modelID, sourceId) => {
                     const targetID = objRef.value;
                     const cacheKey = getPsetCacheKey(sourceId, targetID);
                     if (!psetCache.has(cacheKey)) psetCache.set(cacheKey, []);
-                    psetCache.get(cacheKey).push({ name: psetName, properties });
+                    psetCache.get(cacheKey).push({ name: psetName, properties, psetId: psetID, relId: relID });
                 }
             } catch (e) {}
         }

@@ -152,6 +152,8 @@ export const hiddenObjectCount = computed(() => manuallyHiddenExpressIDs.size);
 export const deletedObjectCount = computed(() => pendingDeletedExpressIDs.size);
 export const openFileCount = computed(() => sourceFiles.value.length);
 export const exportListVersion = ref(0);
+// Tăng khi model đổi vị trí (nạp/xóa file, căn giữa, dịch chuyển) để các tọa độ hiển thị tính lại
+export const coordVersion = ref(0);
 
 export const hoveredType = ref('');
 export const faultyCount = ref(0);
@@ -181,7 +183,21 @@ export const contextMenu = reactive({
     x: 0,
     y: 0,
     attrKey: '',
-    attrValue: ''
+    attrValue: '',
+    // Tên Pset khi chuột phải vào một thuộc tính Pset (rỗng = attribute thường); editable = sửa được giá trị
+    psetName: '',
+    editable: false
+});
+
+// Hộp thoại sửa giá trị thuộc tính Pset cho các cấu kiện đang chọn (src/ifc/pset-edit.js)
+export const psetEditDialog = reactive({
+    visible: false,
+    psetName: '',
+    propName: '',
+    value: '',
+    original: '',
+    kind: 'text',
+    targetCount: 0
 });
 
 export const editableAttributes = reactive({

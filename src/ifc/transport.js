@@ -11,7 +11,7 @@ import { centerModelByBoundingBox } from './loader.js';
 import { rebuildBatches } from '../scene/rendering.js';
 import { fitCameraToModel } from '../scene/scene.js';
 import { updateSelectionOutlines } from '../selection/selection.js';
-import { clashModeActive, deletedItems, dimModeActive, showEdges, editHistoryCount, edgesGroup, hasUnsavedChanges, isCropBoxActive, rt, showTransportProfileModal, sourceFiles, transportHistory, transportInputFields, transportInputs, transportProfileName, transportProfileNameInput, transportProfileStorageKey, transportProfiles, transportRotationAxis } from '../state/state.js';
+import { clashModeActive, coordVersion, deletedItems, dimModeActive, showEdges, editHistoryCount, edgesGroup, hasUnsavedChanges, isCropBoxActive, rt, showTransportProfileModal, sourceFiles, transportHistory, transportInputFields, transportInputs, transportProfileName, transportProfileNameInput, transportProfileStorageKey, transportProfiles, transportRotationAxis } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
 import { t } from '../i18n/index.js';
 
@@ -308,6 +308,7 @@ export const applyIfcTransportToModel = (modelID, unitMeters, transportMatrix) =
 
 // Cập nhật các thứ phụ thuộc vị trí model sau khi căn giữa lại (dịch chuyển nằm sẵn trong ma trận từng cấu kiện)
 export const updateTransportScene = () => {
+    coordVersion.value++;
     syncDimensionsToModelFrame();
     updateSelectionOutlines();
 };

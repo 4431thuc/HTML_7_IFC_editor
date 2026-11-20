@@ -352,6 +352,36 @@ export const removeSourceFile = (source) => {
     showToast(t('Đã loại bỏ file'), t('Đã xóa "{0}" khỏi view và các danh sách.', [source.name]), 'success');
 };
 
+// Material dùng chung theo (loại, màu, độ trong suốt IFC); tái sử dụng cho hàng nghìn cấu kiện (giảm VRAM & draw call).
+// Dùng cả khi đổi màu cấu kiện sau khi nạp (ví dụ sửa đường kính thép trong Pset).
+export const getModelMaterial = (typeName, isRebar, colorHex, opacity = 1) => {
+    const meshColor = new THREE.Color(colorHex);
+    const isTransparent = opacity < 0.99;
+    const matKey = `${typeName}_${meshColor.getHexString()}_${opacity.toFixed(2)}`;
+    let material = materialCache.get(matKey);
+    if (!material) {
+        material = new THREE.MeshStandardMaterial({
+            color: meshColor,
+            opacity: opacity,
+            transparent: isTransparent,
+            roughness: isRebar ? 0.35 : 0.6,
+            metalness: isRebar ? 0.45 : 0.08,
+            side: THREE.DoubleSide,
+            depthWrite: !isTransparent,
+            clippingPlanes: isCropBoxActive.value ? clippingPlanes : null
+        });
+        material.wireframe = isWireframe.value;
+        materialCache.set(matKey, material);
+    }
+    const activeClippingPlanes = isCropBoxActive.value ? clippingPlanes : null;
+    if (material.clippingPlanes !== activeClippingPlanes) {
+        material.clippingPlanes = activeClippingPlanes;
+        material.needsUpdate = true;
+    }
+    applyModelOpacityToMaterial(material);
+    return material;
+};
+
 export const createThreeMeshFromIfc = (modelID, expressID, typeName, isRebar, placedGeometry, metaAttrs) => {
     const geometryData = rt.ifcAPI.GetGeometry(modelID, placedGeometry.geometryExpressID);
     const verts = rt.ifcAPI.GetVertexArray(geometryData.GetVertexData(), geometryData.GetVertexDataSize());
@@ -403,34 +433,9 @@ export const createThreeMeshFromIfc = (modelID, expressID, typeName, isRebar, pl
         assignedColorHex = ENTITY_DEFAULT_COLORS[typeName] || '#78716c';
     }
 
-    const meshColor = new THREE.Color(assignedColorHex);
     const rawColor = placedGeometry.color;
     const opacity = rawColor?.w < 0.98 ? rawColor.w : 1.0;
-    const isTransparent = opacity < 0.99;
-    const matKey = `${typeName}_${meshColor.getHexString()}_${opacity.toFixed(2)}`;
-
-    // TÁI SỬ DỤNG MATERIAL CACHE CHO HÀNG NGHÌN ĐỐI TƯỢNG (GIẢM BỘ NHỚ VRAM & DRAW CALLS)
-    let material = materialCache.get(matKey);
-    if (!material) {
-        material = new THREE.MeshStandardMaterial({
-            color: meshColor,
-            opacity: opacity,
-            transparent: isTransparent,
-            roughness: isRebar ? 0.35 : 0.6,
-            metalness: isRebar ? 0.45 : 0.08,
-            side: THREE.DoubleSide,
-            depthWrite: !isTransparent,
-            clippingPlanes: isCropBoxActive.value ? clippingPlanes : null
-        });
-        material.wireframe = isWireframe.value;
-        materialCache.set(matKey, material);
-    }
-    const activeClippingPlanes = isCropBoxActive.value ? clippingPlanes : null;
-    if (material.clippingPlanes !== activeClippingPlanes) {
-        material.clippingPlanes = activeClippingPlanes;
-        material.needsUpdate = true;
-    }
-    applyModelOpacityToMaterial(material);
+    const material = getModelMaterial(typeName, isRebar, assignedColorHex, opacity);
 
     const mesh = new THREE.Mesh(bufferGeo, material);
     const matrix = new THREE.Matrix4();
@@ -459,6 +464,7 @@ export const createThreeMeshFromIfc = (modelID, expressID, typeName, isRebar, pl
         diameter: metaAttrs.diameter || 0,
         colorByDiameter: isRebar ? assignedColorHex : '',
         originalMaterial: material,
+        ifcOpacity: opacity,
         isFaulty: false
     };
 
