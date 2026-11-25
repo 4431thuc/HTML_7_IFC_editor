@@ -11,7 +11,7 @@ import { getRebarColorByDiameter } from '../scene/sample-model.js';
 import { fitCameraToModel } from '../scene/scene.js';
 import { clearSelection, updateSelectionDimmingEffect } from '../selection/selection.js';
 import { ENTITY_DEFAULT_COLORS, REBAR_ENTITY_TYPES, parseDiameterMm } from '../state/constants.js';
-import { duplicateFilePrompt, clashResultsReady, allGroups, batchGroup, clippingPlanes, deletedItems, edgesGroup, exportListVersion, faultyCount, fileName, hasLoadedIfc, hoveredType, isCropBoxActive, isEditingAttributes, isIfcDragOver, isLoading, isSampleModel, isWireframe, loadingText, manuallyHiddenExpressIDs, materialCache, overlayGroup, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes, selectedObject, showEdges, sourceFiles, stats, toastMessage } from '../state/state.js';
+import { duplicateFilePrompt, groupColorScheme, clashResultsReady, allGroups, batchGroup, clippingPlanes, deletedItems, edgesGroup, exportListVersion, faultyCount, fileName, hasLoadedIfc, hoveredType, isCropBoxActive, isEditingAttributes, isIfcDragOver, isLoading, isSampleModel, isWireframe, loadingText, manuallyHiddenExpressIDs, materialCache, overlayGroup, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes, selectedObject, showEdges, sourceFiles, stats, toastMessage } from '../state/state.js';
 import { applyModelOpacityToMaterial, showToast } from '../ui/panels.js';
 import { showPropertiesForMesh } from '../ui/properties.js';
 import { removeProjectInfo, showProjectInfoForSource } from './project-info.js';
@@ -501,6 +501,8 @@ export const centerModelByBoundingBox = () => {
 
 export const clearCurrentModel = () => {
     resetHistory();
+    // File mới mở dùng lại màu mặc định (không giữ bảng màu theo nhóm của model cũ)
+    groupColorScheme.value = '';
     clearClashResults();
     clearAllDimensions();
     clearSelection();

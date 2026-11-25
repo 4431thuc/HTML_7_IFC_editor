@@ -5,6 +5,7 @@ import { updateSelectionDimmingEffect } from '../selection/selection.js';
 import { edgeMaterial, edgesGroup, filterFaultyBars, hoverMaterial, isFlatShading, isRebarOnly, isWireframe, isXRayMode, materialCache, rt, selectMaterial, showEdges, showGrid } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
 import { t } from '../i18n/index.js';
+import { modelEdgeAngleDeg, modelEdgeAngleStorageKey } from '../state/state.js';
 
 // TỐI ƯU HÓA HIỆU NĂNG: CHỈ TẠO VIỀN EDGES CHO CÁC KHỐI LỚN
 export const toggleEdges = () => {
@@ -30,7 +31,7 @@ export const createEdgeOutline = (mesh, bufferGeo) => {
         // Tối ưu hóa: Chỉ tạo edges cho các cấu kiện có số đỉnh vừa phải để tránh lag khi mở file 30MB
         if (bufferGeo.attributes.position.count > 4000) return;
 
-        const edgesGeo = new THREE.EdgesGeometry(bufferGeo, 24);
+        const edgesGeo = new THREE.EdgesGeometry(bufferGeo, modelEdgeAngleDeg.value);
         const line = new THREE.LineSegments(edgesGeo, edgeMaterial);
         line.matrixAutoUpdate = false;
         mesh.updateMatrix();
@@ -49,6 +50,25 @@ export const ensureEdgesForVisibleMeshes = () => {
             createEdgeOutline(mesh, mesh.geometry);
         }
     });
+};
+
+// Đổi ngưỡng góc nếp gấp: bỏ viền riêng của từng cấu kiện (giữ đường giao giữa các cấu kiện), tạo lại theo góc mới.
+// Gọi khi thả thanh kéo (không gọi liên tục lúc kéo vì EdgesGeometry của cả model khá nặng).
+export const applyModelEdgeAngle = () => {
+    try {
+        localStorage.setItem(modelEdgeAngleStorageKey, String(modelEdgeAngleDeg.value));
+    } catch (error) {
+        console.error('Không thể lưu cài đặt góc nếp gấp:', error);
+    }
+    edgesGroup.children.slice().forEach(line => {
+        if (line.userData.pairMesh) return;
+        line.geometry?.dispose();
+        edgesGroup.remove(line);
+    });
+    rt.modelGroup?.children.forEach(mesh => {
+        if (mesh.isMesh) mesh.userData.edgesBuilt = false;
+    });
+    updateEdgesVisibility();
 };
 
 // --- 6. CÁC TÙY CHỌN HIỂN THỊ ---

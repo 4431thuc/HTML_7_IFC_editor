@@ -1,6 +1,6 @@
 import { computed, reactive, ref, shallowRef } from 'vue';
 import * as THREE from 'three';
-import { INTRO_PANEL_CONTENT } from './constants.js';
+import { EDGE_ANGLE_MAX_DEG, EDGE_ANGLE_MIN_DEG, INTRO_PANEL_CONTENT, MODEL_EDGE_ANGLE_DEG } from './constants.js';
 
 export const canvasContainer = ref(null);
 export const introPanelContent = INTRO_PANEL_CONTENT;
@@ -142,6 +142,21 @@ export const readStoredBackgroundLight = () => {
     }
 };
 export const isLightBackground = ref(readStoredBackgroundLight());
+
+// NGƯỠNG GÓC NẾP GẤP: viền hiển thị (src/scene/display.js) và cạnh bắt điểm khi đo (src/dimension/dimension.js)
+export const modelEdgeAngleStorageKey = 'ifc-editor-edge-angle';
+export const snapEdgeAngleStorageKey = 'ifc-editor-snap-edge-angle';
+const readStoredAngle = (key) => {
+    try {
+        const value = Number(localStorage.getItem(key));
+        if (value >= EDGE_ANGLE_MIN_DEG && value <= EDGE_ANGLE_MAX_DEG) return value;
+    } catch (error) {
+        console.error('Không thể đọc cài đặt góc nếp gấp:', error);
+    }
+    return MODEL_EDGE_ANGLE_DEG;
+};
+export const modelEdgeAngleDeg = ref(readStoredAngle(modelEdgeAngleStorageKey));
+export const snapEdgeAngleDeg = ref(readStoredAngle(snapEdgeAngleStorageKey));
 // Mặc định nền sáng kỹ thuật sạch sẽ
 
 // CROPBOX (SECTION BOX 6 MẶT MŨI TÊN ĐỘC LẬP)
@@ -199,6 +214,12 @@ export const contextMenu = reactive({
     psetName: '',
     editable: false
 });
+
+// Menu chuột phải trên tiêu đề tab phân nhóm (Pos / Name / ObjType / IFC Type)
+export const groupTabMenu = reactive({ visible: false, x: 0, y: 0, criterion: '' });
+// Bảng màu đang tô cho model: '' = màu mặc định (loại IFC / đường kính thép), hoặc tên tiêu chí nhóm
+// ('pos' | 'name' | 'objectType' | 'entity') = tô theo màu chấm tròn của các nhóm (src/ifc/color-scheme.js)
+export const groupColorScheme = ref('');
 
 // Hộp thoại sửa giá trị thuộc tính Pset cho các cấu kiện đang chọn (src/ifc/pset-edit.js)
 export const psetEditDialog = reactive({

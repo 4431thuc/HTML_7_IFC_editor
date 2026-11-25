@@ -407,6 +407,18 @@ export const EN = {
     'Chọn tương tự': 'Select similar',
     'Chỉ hiện tương tự': 'Show similar only',
     'Lọc theo giá trị': 'Filter by value',
+    'Chuột phải: tô màu model theo nhóm': 'Right-click: color the model by group',
+    'Áp dụng màu của tab': "Apply this tab's colors",
+    'Khôi phục màu mặc định': 'Restore default colors',
+    'Viền nếp gấp: góc tối thiểu': 'Fold edges: minimum angle',
+    'Bắt cạnh khi đo: góc tối thiểu': 'Measure edge snap: minimum angle',
+    'Góc nhỏ: thấy/bắt được cả nếp gấp nhẹ (đổi dốc sàn), nhưng mặt cong hiện thêm sọc. Góc lớn: chỉ cạnh gấp rõ.': 'Small angle: shows/snaps even slight folds (slab slope changes), but curved surfaces get extra lines. Large angle: only sharp edges.',
+    'Chưa có nhóm': 'No groups yet',
+    'Mở file IFC trước khi tô màu theo nhóm.': 'Open an IFC file before coloring by group.',
+    'Đã đổi màu model': 'Model recolored',
+    'Model đang tô theo màu nhóm của tab "{0}".': 'The model is colored by the group colors of the "{0}" tab.',
+    'Đã khôi phục màu': 'Colors restored',
+    'Model trở về màu mặc định (theo loại IFC và đường kính thép).': 'The model is back to default colors (by IFC type and bar diameter).',
     'Đã áp bộ lọc: "{0}"': 'Filter applied: "{0}"',
 
     // --- Toast / thông báo ---

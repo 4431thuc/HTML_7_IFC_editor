@@ -1,6 +1,13 @@
 // Tab Thống kê thép (bar schedule) tạm ẩn vì kết quả chưa chính xác; đổi thành true để bật lại
 export const SHOW_BAR_SCHEDULE_TAB = false;
 
+// Ngưỡng góc nếp gấp (độ): vẽ cạnh / bắt cạnh khi 2 mặt kề nhau gấp lớn hơn góc này.
+// Mặc định 8° đủ thấy nếp đổi dốc của sàn/mái; hạ thấp nữa thì mặt cong (cột tròn, ống) hiện sọc theo từng mặt chia.
+// Người dùng chỉnh bằng thanh kéo ở tab Hiển thị (modelEdgeAngleDeg / snapEdgeAngleDeg trong state.js).
+export const MODEL_EDGE_ANGLE_DEG = 8;
+export const EDGE_ANGLE_MIN_DEG = 1;
+export const EDGE_ANGLE_MAX_DEG = 45;
+
 // Bảng màu phân biệt cấu kiện kiến trúc & kết cấu
 export const ENTITY_DEFAULT_COLORS = {
     'IFCCOLUMN': '#0284c7',               // Xanh lam cột kết cấu

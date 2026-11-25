@@ -492,6 +492,27 @@
                                 <span class="text-[10px] text-slate-500">{{ showGrid ? t('BẬT') : t('TẮT') }}</span>
                             </button>
                         </div>
+
+                        <!-- Ngưỡng góc nếp gấp: viền hiển thị và cạnh bắt điểm khi đo (áp dụng khi thả thanh kéo) -->
+                        <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2.5">
+                            <div>
+                                <div class="flex justify-between text-slate-300 text-[11px] mb-1">
+                                    <span>{{ t('Viền nếp gấp: góc tối thiểu') }}</span>
+                                    <span class="font-mono text-amber-400">{{ modelEdgeAngleDeg }}°</span>
+                                </div>
+                                <input type="range" min="1" max="45" step="1" v-model.number="modelEdgeAngleDeg" @change="applyModelEdgeAngle"
+                                    class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-slate-300 text-[11px] mb-1">
+                                    <span>{{ t('Bắt cạnh khi đo: góc tối thiểu') }}</span>
+                                    <span class="font-mono text-red-400">{{ snapEdgeAngleDeg }}°</span>
+                                </div>
+                                <input type="range" min="1" max="45" step="1" v-model.number="snapEdgeAngleDeg" @change="applySnapEdgeAngle"
+                                    class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-red-500">
+                            </div>
+                            <p class="text-[10px] leading-relaxed text-slate-500">{{ t('Góc nhỏ: thấy/bắt được cả nếp gấp nhẹ (đổi dốc sàn), nhưng mặt cong hiện thêm sọc. Góc lớn: chỉ cạnh gấp rõ.') }}</p>
+                        </div>
                     </div>
                 </div>
 
@@ -576,25 +597,25 @@
                     </div>
 
                     <div class="grid grid-cols-4 gap-1 p-1 bg-slate-900 rounded-lg border border-slate-800 text-[11px]">
-                        <button @click="groupCriterion = 'pos'" 
+                        <button @click="groupCriterion = 'pos'" @contextmenu.prevent="openGroupTabMenu($event, 'pos')" :title="t('Chuột phải: tô màu model theo nhóm')" 
                             :class="groupCriterion === 'pos' ? 'bg-amber-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
                             class="py-1 rounded transition text-center truncate">
-                            {{ t('Pos Thép') }}
+                            <i v-if="groupColorScheme === 'pos'" class="ph-fill ph-palette mr-0.5"></i>{{ t('Pos Thép') }}
                         </button>
-                        <button @click="groupCriterion = 'name'" 
+                        <button @click="groupCriterion = 'name'" @contextmenu.prevent="openGroupTabMenu($event, 'name')" :title="t('Chuột phải: tô màu model theo nhóm')" 
                             :class="groupCriterion === 'name' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
                             class="py-1 rounded transition text-center truncate">
-                            {{ t('Tên (Name)') }}
+                            <i v-if="groupColorScheme === 'name'" class="ph-fill ph-palette mr-0.5"></i>{{ t('Tên (Name)') }}
                         </button>
-                        <button @click="groupCriterion = 'objectType'" 
+                        <button @click="groupCriterion = 'objectType'" @contextmenu.prevent="openGroupTabMenu($event, 'objectType')" :title="t('Chuột phải: tô màu model theo nhóm')" 
                             :class="groupCriterion === 'objectType' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
                             class="py-1 rounded transition text-center truncate">
-                            {{ t('ObjType') }}
+                            <i v-if="groupColorScheme === 'objectType'" class="ph-fill ph-palette mr-0.5"></i>{{ t('ObjType') }}
                         </button>
-                        <button @click="groupCriterion = 'entity'" 
+                        <button @click="groupCriterion = 'entity'" @contextmenu.prevent="openGroupTabMenu($event, 'entity')" :title="t('Chuột phải: tô màu model theo nhóm')" 
                             :class="groupCriterion === 'entity' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
                             class="py-1 rounded transition text-center truncate">
-                            {{ t('IFC Type') }}
+                            <i v-if="groupColorScheme === 'entity'" class="ph-fill ph-palette mr-0.5"></i>{{ t('IFC Type') }}
                         </button>
                     </div>
 
@@ -1686,6 +1707,23 @@
             class="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-200">
             <i class="ph-bold ph-funnel text-amber-400"></i>
             <span>{{ t('Lọc theo giá trị') }}</span>
+        </button>
+    </div>
+
+    <!-- MENU CHUỘT PHẢI TRÊN TIÊU ĐỀ TAB PHÂN NHÓM: tô màu model theo màu chấm tròn của nhóm -->
+    <div v-if="groupTabMenu.visible" data-context-menu
+        :style="{ top: `${groupTabMenu.y}px`, left: `${groupTabMenu.x}px` }"
+        class="fixed z-50 w-60 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden py-1 text-xs select-none">
+        <button @click="applyGroupColorScheme(groupTabMenu.criterion)"
+            class="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-200">
+            <i class="ph-bold ph-palette text-amber-400"></i>
+            <span class="flex-1">{{ t('Áp dụng màu của tab') }}</span>
+            <i v-if="groupColorScheme === groupTabMenu.criterion" class="ph-bold ph-check text-emerald-400"></i>
+        </button>
+        <button @click="resetGroupColorScheme()" :disabled="!groupColorScheme"
+            class="w-full px-3 py-2 text-left hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 text-slate-200">
+            <i class="ph-bold ph-arrow-counter-clockwise text-cyan-400"></i>
+            <span>{{ t('Khôi phục màu mặc định') }}</span>
         </button>
     </div>
 

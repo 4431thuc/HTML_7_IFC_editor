@@ -2,6 +2,7 @@ import * as WebIFC from 'web-ifc';
 import { computed } from 'vue';
 import { getMeshKey, getPsetCacheKey, requestRender } from '../core/helpers.js';
 import { pushHistory } from '../core/history.js';
+import { reapplyGroupColorScheme } from './color-scheme.js';
 import { ensureEdgesForVisibleMeshes } from '../scene/display.js';
 import { ensureIntersectionEdges } from '../scene/intersections.js';
 import { getRebarColorByDiameter } from '../scene/sample-model.js';
@@ -197,6 +198,8 @@ export const buildAllGroupingCollections = () => {
             grp.objects.sort(byName);
         });
     });
+    // Đang tô màu theo một tab nhóm: tô lại theo danh sách nhóm mới (cấu kiện mới nạp, Name/Pos vừa sửa...)
+    reapplyGroupColorScheme();
 };
 
 export const getEntityLabel = (type) => {

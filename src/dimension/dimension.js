@@ -8,7 +8,7 @@ import { ensureBoundsTree, ensureIntersectionEdges, intersectionLinesByMesh } fr
 import { restoreMeshMaterial } from '../scene/rendering.js';
 import { getVisibleModelIntersections } from '../selection/input.js';
 import { isMeshSelected, resolveHitElement } from '../selection/selection.js';
-import { dimGroup, dimItems, dimModeActive, isOrthographic, leftActiveTab, mouse, raycaster, rt, selectedDimId } from '../state/state.js';
+import { snapEdgeAngleDeg, snapEdgeAngleStorageKey, dimGroup, dimItems, dimModeActive, isOrthographic, leftActiveTab, mouse, raycaster, rt, selectedDimId } from '../state/state.js';
 
 const DIM_COLOR = 0xef4444;
 const DIM_SELECTED_COLOR = 0xf59e0b;
@@ -26,7 +26,6 @@ const SURFACE_DISC_RADIUS_PX = 14;
 // Viền được bắt dày gấp đôi viền thường (1px)
 const SNAP_LINE_WIDTH_PX = 2;
 const LABEL_OPACITY = 0.8;
-const SNAP_EDGE_ANGLE_DEG = 24;
 const SNAP_MAX_VERTEX_COUNT = 60000;
 const HOVER_COLOR = 0xffffff;
 const HOVER_SNAP_COLOR = 0x00008b;
@@ -275,13 +274,22 @@ export const updateDimensionScales = () => {
 };
 
 // Cạnh cứng (EdgesGeometry) của cấu kiện, tính một lần rồi cache theo mesh; null nếu quá nặng
-const edgePositionCache = new WeakMap();
+// Ngưỡng góc lấy từ thanh kéo "Bắt cạnh khi đo" (snapEdgeAngleDeg); đổi góc thì xóa cache
+let edgePositionCache = new WeakMap();
+export const applySnapEdgeAngle = () => {
+    try {
+        localStorage.setItem(snapEdgeAngleStorageKey, String(snapEdgeAngleDeg.value));
+    } catch (error) {
+        console.error('Không thể lưu cài đặt góc bắt cạnh:', error);
+    }
+    edgePositionCache = new WeakMap();
+};
 const getElementEdgePositions = (element) => {
     if (edgePositionCache.has(element)) return edgePositionCache.get(element);
     let positions = null;
     const position = element?.geometry?.attributes?.position;
     if (position && position.count <= SNAP_MAX_VERTEX_COUNT) {
-        const edges = new THREE.EdgesGeometry(element.geometry, SNAP_EDGE_ANGLE_DEG);
+        const edges = new THREE.EdgesGeometry(element.geometry, snapEdgeAngleDeg.value);
         positions = edges.attributes.position.array;
         edges.dispose();
     }

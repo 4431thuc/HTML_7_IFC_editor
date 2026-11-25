@@ -8,7 +8,7 @@
 
 | Nhóm | Chức năng | Giá trị mang lại |
 |---|---|---|
-| Xem 3D | Render theo yêu cầu, batch hình học, X-Ray, wireframe, viền cạnh, độ mờ mô hình | Mô hình lớn (hàng chục MB) vẫn mượt |
+| Xem 3D | Render theo yêu cầu, batch hình học, X-Ray, wireframe, viền cạnh (thanh kéo góc nếp gấp, mặc định 8° để thấy cả chỗ đổi dốc sàn), độ mờ mô hình; **tô màu model theo nhóm** (chuột phải tiêu đề tab Pos / Name / ObjType / IFC Type) | Mô hình lớn (hàng chục MB) vẫn mượt, phân biệt nhóm bằng màu |
 | Điều hướng | **ViewCube** 26 hướng (6 mặt, 12 cạnh, 8 góc) ở góc trên trái view, đồng bộ với camera, trục X/Y/Z (Z hướng lên), Persp/Ortho | Chuyển hướng nhìn một chạm, nhấp đúp nút giữa để zoom toàn bộ |
 | CropBox | Cắt lát 6 mặt độc lập, kéo bằng mũi tên 3D | Soi bên trong cấu kiện, tập trung vùng quan tâm |
 | **Đo đạc** | Đo khoảng cách 2 điểm (phím D), tự bắt điểm vào cạnh, góc giao, vuông góc với cạnh / bề mặt, gợi ý trước vị trí điểm vuông góc, tọa độ điểm theo hệ dự án | Đo nhanh trên model, kể cả đường giao giữa các cấu kiện |
@@ -128,7 +128,7 @@ Bấm **D** (không kích hoạt khi đang gõ trong ô nhập) để bật/tắ
 | 4 | Điểm gần nhất trên cạnh | Cạnh tô vàng |
 | 5 | Điểm trên bề mặt | Quả cầu trắng |
 
-- Cạnh bắt điểm gồm viền cứng của cấu kiện và **đường giao giữa các cấu kiện** (tính nền, cũng hiển thị như viền khi bật Viền mép).
+- Cạnh bắt điểm gồm viền cứng của cấu kiện và **đường giao giữa các cấu kiện** (tính nền, cũng hiển thị như viền khi bật Viền mép). Độ nhạy bắt cạnh chỉnh bằng thanh kéo "Bắt cạnh khi đo" ở tab Hiển thị (góc gấp tối thiểu, mặc định 8°).
 - Ra ngoài không trung, vùng đối tượng ẩn hoặc bị CropBox cắt: cursor bàn tay, không bắt điểm.
 - Bấm D lần nữa: ẩn toàn bộ hiển thị đo nhưng giữ danh sách. Bấm nhóm đo để zoom tới khoảng đo, nút ✕ để xóa.
 

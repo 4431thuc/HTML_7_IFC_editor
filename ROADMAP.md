@@ -26,7 +26,7 @@ Danh sách việc cần làm rút ra từ buổi rà soát code. Đánh dấu `[
 ### Ưu tiên trung bình
 - [ ] **Cây cấu trúc không gian** Project > Site > Building > Storey > cấu kiện (`IfcRelContainedInSpatialStructure`, `IfcRelAggregates`).
 - [ ] **Bộ lọc/tìm kiếm nâng cao**: điều kiện kiểu `Pset.X = ... AND Ø >= 16`, lưu bộ lọc.
-- [ ] **Tô màu theo thuộc tính bất kỳ** (color by property) kèm chú thích màu.
+- [ ] **Tô màu theo thuộc tính bất kỳ** (color by property) kèm chú thích màu. Đã có bước đầu: tô theo màu nhóm của tab Pos / Name / ObjType / IFC Type (`src/ifc/color-scheme.js`).
 - [ ] **Mặt cắt (section plane)** tùy ý theo trục, xem 2D trực giao, đo trên mặt cắt.
 - [ ] **Saved views / viewpoint**: lưu camera + ẩn/hiện + CropBox.
 - [ ] **BCF**: issue có ảnh chụp + viewpoint, trao đổi với Revit/Allplan/Solibri.

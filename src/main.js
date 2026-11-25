@@ -20,6 +20,7 @@ import { duplicateFilePrompt, currentProjectInfo, projectInfoDirty, projectInfoS
 import { hoverViewDir, viewCubeEl } from './state/state.js';
 import { SHOW_BAR_SCHEDULE_TAB, VIEW_CUBE_FACES } from './state/constants.js';
 import { clashCancelPrompt, clashHideOtherRebar, clashResultsReady } from './state/state.js';
+import { applyGroupColorScheme, openGroupTabMenu, resetGroupColorScheme } from './ifc/color-scheme.js';
 import { closeContextMenu, contextMenuAction, handleContextMenuEscape, handleContextMenuOutsidePointer, openContextMenu } from './ui/context-menu.js';
 import { adjustPanelWidth, boxSelectionStyle, closeIntroPanel, endPanelResize, persistModelOpacity, playUiPop, startPanelResize, togglePropertiesPanel, updateModelOpacity, updatePanelResize } from './ui/panels.js';
 import { resetEditableAttributes, saveAttributeChanges } from './ui/properties.js';
@@ -32,6 +33,9 @@ import { barScheduleDiameters, barScheduleRows, barScheduleSplitByFile, barSched
 import { psetEditDialog } from './state/state.js';
 import { getSelectedCoords, getSourceCoords } from './ui/coords-info.js';
 import { coordVersion } from './state/state.js';
+import { groupColorScheme, groupTabMenu, modelEdgeAngleDeg, snapEdgeAngleDeg } from './state/state.js';
+import { applyModelEdgeAngle } from './scene/display.js';
+import { applySnapEdgeAngle } from './dimension/dimension.js';
 
 // Kích hoạt raycast/bounds tree tăng tốc bằng three-mesh-bvh
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -286,6 +290,15 @@ createApp({
             isMeshManuallyHidden,
             isMeshPendingRemoval,
             openContextMenu,
+            applyGroupColorScheme,
+            openGroupTabMenu,
+            resetGroupColorScheme,
+            groupColorScheme,
+            groupTabMenu,
+            modelEdgeAngleDeg,
+            snapEdgeAngleDeg,
+            applyModelEdgeAngle,
+            applySnapEdgeAngle,
             closeContextMenu,
             contextMenuAction,
             saveAttributeChanges,

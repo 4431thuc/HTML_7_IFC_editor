@@ -2,7 +2,7 @@ import { getMeshKey, getPsetCacheKey } from '../core/helpers.js';
 import { openPsetEditDialog } from '../ifc/pset-edit.js';
 import { updateAllMeshesVisibility } from '../ifc/groups.js';
 import { updateSelectionDimmingEffect } from '../selection/selection.js';
-import { contextMenu, groupSearchQuery, leftActiveTab, manuallyHiddenExpressIDs, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes } from '../state/state.js';
+import { contextMenu, groupSearchQuery, groupTabMenu, leftActiveTab, manuallyHiddenExpressIDs, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes } from '../state/state.js';
 import { showToast } from './panels.js';
 import { t } from '../i18n/index.js';
 
@@ -24,13 +24,16 @@ export const closeContextMenu = () => {
 
 // Bấm chuột ra ngoài menu (kể cả chuột phải) thì đóng menu
 export const handleContextMenuOutsidePointer = (event) => {
-    if (!contextMenu.visible) return;
+    if (!contextMenu.visible && !groupTabMenu.visible) return;
     if (event.target.closest && event.target.closest('[data-context-menu]')) return;
     closeContextMenu();
+    groupTabMenu.visible = false;
 };
 
 export const handleContextMenuEscape = (event) => {
-    if (contextMenu.visible && event.key === 'Escape') closeContextMenu();
+    if (event.key !== 'Escape') return;
+    if (contextMenu.visible) closeContextMenu();
+    groupTabMenu.visible = false;
 };
 
 export const contextMenuAction = (action) => {
