@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { Brush, Evaluator, INTERSECTION } from 'three-bvh-csg';
-import { markRaw, nextTick } from 'vue';
-import { getMeshKey, getObjectMeshes, requestRender } from '../core/helpers.js';
+import { markRaw, nextTick, toRaw } from 'vue';
+import { getMeshKey, getObjectMeshes, getPsetCacheKey, requestRender } from '../core/helpers.js';
 import { refreshBatchMaterials } from '../scene/rendering.js';
 import { clearSelection } from '../selection/selection.js';
 import { getEntityLabel } from '../ifc/groups.js';
 import { buildConnectionIndex, isBarMesh } from '../ifc/rebar-connections.js';
-import { batchGroup, clashAnnotationGroup, clashCancelPrompt, clashConnectorCount, clashDuplicateCount, clashResultsReady, clashSkippedConnectionPairs, clashVolumeMaterial, clashFlashMaterial, clashHideOtherRebar, clashInvolvedMaterial, CLASH_GHOST_LAYER, clashBusy, clashContextGroup, clashContextMaterial, clashCount, clashError, clashGroup, clashItems, clashModeActive, clashOutlineMaterial, clashPairGroup, clashPairMaterialA, clashPairMaterialB, clashProgress, clashSelectionGroup, clashToleranceMm, clashTypeA, clashTypeB, clashVolume, clashYellowMaterial, edgesGroup, isOrthographic, overlayGroup, pendingDeletedExpressIDs, rt, selectedClashId, selectionOutlineMaterial, showClashPairObjects, showEdges } from '../state/state.js';
+import { batchGroup, clashAnnotationGroup, clashCancelPrompt, clashConnectorCount, clashDuplicateCount, clashResultsReady, clashSkippedConnectionPairs, clashVolumeMaterial, clashFlashMaterial, clashHideOtherRebar, clashInvolvedMaterial, CLASH_GHOST_LAYER, clashBusy, clashContextGroup, clashContextMaterial, clashCount, clashError, clashGroup, clashItems, clashModeActive, clashOutlineMaterial, clashPairGroup, clashPairMaterialA, clashPairMaterialB, clashProgress, clashSelectionGroup, clashToleranceMm, clashTypeA, clashTypeB, clashVolume, clashYellowMaterial, edgesGroup, isOrthographic, overlayGroup, pendingDeletedExpressIDs, psetCache, rt, selectedClashId, selectionOutlineMaterial, showClashPairObjects, showEdges } from '../state/state.js';
 import { applyModelOpacityToScene, showToast } from '../ui/panels.js';
 import { t } from '../i18n/index.js';
 
@@ -136,9 +136,32 @@ const worldUnitsPerPixel = (position) => {
     return 2 * distance * Math.tan(THREE.MathUtils.degToRad(rt.camera.fov) / 2) / height;
 };
 
-// Mô tả ngắn một cấu kiện: thép -> Pos + Ø, loại khác -> tên loại + Tag/Name
+// Liên kết thép (coupler, đầu ren) -> các thanh thép chủ, ghi lại ở mỗi lần kiểm tra (runClashCheck)
+const connectorHostsByMesh = new WeakMap();
+
+// Mã liên kết lấy từ Pset (bản Allplan giữ lại nhiều khi mang Name của thanh thép), thiếu thì dùng Tag/Name
+const CONNECTOR_CODE_PROPERTIES = ['articlenumber', 'bezeichnung'];
+const getConnectorCode = (ud) => {
+    const psets = psetCache.get(getPsetCacheKey(ud.sourceId, ud.expressID)) || [];
+    for (const propertyName of CONNECTOR_CODE_PROPERTIES) {
+        for (const pset of psets) {
+            const property = pset.properties.find(entry => entry.name.toLowerCase() === propertyName);
+            if (property && property.value && property.value !== '—') return property.value;
+        }
+    }
+    return ud.tag || ud.objectType || ud.name || `#${ud.expressID}`;
+};
+
+const uniqueJoined = (values) => Array.from(new Set(values.map(value => value || '?'))).join('/');
+
+// Mô tả ngắn một cấu kiện: thép -> Pos + Ø; liên kết thép -> Pos + Ø của thép chủ rồi mã liên kết
+// (vd Pos 1010-Ø14-TTS14; coupler nối 2 thanh khác Pos: Pos 1010/1012-Ø14-TTS14); loại khác -> tên loại + Tag/Name
 export const describeClashElement = (mesh) => {
     const ud = mesh?.userData || {};
+    const hosts = mesh ? connectorHostsByMesh.get(toRaw(mesh)) : null;
+    if (hosts?.length) {
+        return `Pos ${uniqueJoined(hosts.map(host => host.userData.tag))}-Ø${uniqueJoined(hosts.map(host => host.userData.diameter))}-${getConnectorCode(ud)}`;
+    }
     if (ud.isRebar) return `Pos ${ud.tag || '?'} · Ø${ud.diameter || '?'}`;
     const label = getEntityLabel(ud.type);
     const typeText = label === 'Thực thể IFC' ? (ud.type || 'IFC') : t(label);
@@ -679,6 +702,12 @@ export const runClashCheck = async () => {
         });
         // Liên kết thép (coupler, đầu ren...) và thép chủ của nó, theo vị trí hiện tại (kể cả sau transport)
         const connections = buildConnectionIndex(candidates);
+        // Nhãn / danh sách ghi Pos + Ø của thép chủ cho liên kết (describeClashElement)
+        candidates.forEach(mesh => {
+            const hosts = connections.hostsOf(mesh);
+            if (hosts?.size) connectorHostsByMesh.set(mesh, Array.from(hosts));
+            else connectorHostsByMesh.delete(mesh);
+        });
         // null: không xét; 'connection': liên kết ↔ thép chủ (bỏ qua); 'same-element': hai thanh cùng một cấu kiện
         // IFC (trước đây luôn bỏ qua, nay chỉ giữ nếu trùng lặp); 'check': kiểm tra bình thường
         const classifyPair = (a, b) => {
