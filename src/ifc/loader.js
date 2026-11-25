@@ -15,6 +15,7 @@ import { duplicateFilePrompt, groupColorScheme, clashResultsReady, allGroups, ba
 import { applyModelOpacityToMaterial, showToast } from '../ui/panels.js';
 import { showPropertiesForMesh } from '../ui/properties.js';
 import { removeProjectInfo, showProjectInfoForSource } from './project-info.js';
+import { findDuplicateConnectors, tagConnectorShapes } from './rebar-connections.js';
 import { t } from '../i18n/index.js';
 
 // --- 4. TẢI IFC VÀO SCENE DÙNG CHUNG ---
@@ -129,6 +130,7 @@ export const loadIfcFile = async (file, replaceCurrent) => {
         let rebarCount = 0;
         let faultyCountAcc = 0;
         const schemaCounts = new Map();
+        const sourceMeshes = [];
 
         rt.ifcAPI.StreamAllMeshes(openedModelID, (flatMesh) => {
             const expressID = flatMesh.expressID;
@@ -194,6 +196,7 @@ export const loadIfcFile = async (file, replaceCurrent) => {
                 if (!mesh) continue;
                 mesh.userData.colorByDiameter = isRebar ? getRebarColorByDiameter(mesh.userData.diameter) : '';
                 rt.modelGroup.add(mesh);
+                sourceMeshes.push(mesh);
                 meshCount++;
                 loadedObjectKeys.add(getMeshKey(mesh));
                 if (isRebar) {
@@ -207,6 +210,32 @@ export const loadIfcFile = async (file, replaceCurrent) => {
         });
 
         if (meshCount === 0) throw new Error(t('Không tìm thấy hình học 3D trong file "{0}".', [file.name]));
+
+        // Liên kết thép (coupler, đầu ren, TTP...): nhận dạng hình học, rồi gỡ bản xuất trùng (Allplan xuất mỗi
+        // liên kết hai lần, trùng khít). Bản sao không có mặt trong scene nên mọi view / danh sách / tab chỉ còn
+        // một; expressID của bản sao ghi ở userData.duplicateExpressIDs của bản giữ lại để xuất IFC xử lý theo.
+        loadingText.value = t('Nhận diện liên kết thép (coupler, đầu ren)...');
+        await new Promise(resolve => setTimeout(resolve, 20));
+        tagConnectorShapes(sourceMeshes);
+        let duplicateConnectorCount = 0;
+        findDuplicateConnectors(sourceMeshes).forEach(group => {
+            const twinIDs = group.twins.map(twin => twin.expressID);
+            group.keepMeshes.forEach(mesh => { mesh.userData.duplicateExpressIDs = twinIDs; });
+            group.twins.forEach(twin => {
+                duplicateConnectorCount++;
+                loadedObjectKeys.delete(twin.key);
+                const typeCount = schemaCounts.get(twin.schemaType) || 0;
+                if (typeCount <= 1) schemaCounts.delete(twin.schemaType);
+                else schemaCounts.set(twin.schemaType, typeCount - 1);
+                twin.meshes.forEach(mesh => {
+                    rt.modelGroup.remove(mesh);
+                    mesh.geometry.boundsTree = null;
+                    mesh.geometry.dispose();
+                    meshCount--;
+                    if (mesh.userData.isRebar) rebarCount--;
+                });
+            });
+        });
         rebuildBatches();
 
         sourceFiles.value.push({
@@ -216,6 +245,7 @@ export const loadIfcFile = async (file, replaceCurrent) => {
             unitMeters,
             meshCount,
             rebarCount,
+            duplicateConnectorCount,
             visible: true,
             schemaName,
             schemaExpanded: false,
@@ -238,7 +268,10 @@ export const loadIfcFile = async (file, replaceCurrent) => {
         updateEdgesVisibility();
         if (isCropBoxActive.value) resetCropBoxToModel();
         showProjectInfoForSource(sourceFiles.value[sourceFiles.value.length - 1]);
-        showToast(t('Tải thành công'), t('Đã thêm "{0}": {1} cấu kiện ({2} cốt thép).', [file.name, loadedObjectKeys.size, rebarCount]), 'success');
+        const loadedMessage = t('Đã thêm "{0}": {1} cấu kiện ({2} cốt thép).', [file.name, loadedObjectKeys.size, rebarCount]);
+        showToast(t('Tải thành công'), duplicateConnectorCount > 0
+            ? `${loadedMessage} ${t('Đã gộp {0} liên kết thép bị xuất trùng (chỉ hiện một).', [duplicateConnectorCount])}`
+            : loadedMessage, 'success');
         return true;
     } catch (error) {
         console.error(`Lỗi phân tích IFC "${file.name}":`, error);

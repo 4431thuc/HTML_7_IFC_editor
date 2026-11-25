@@ -95,20 +95,27 @@ export const createFilteredIfcData = (mode) => {
             applyIfcTransportToModel(tempModelID, source.unitMeters || 1, getSourceTransportMatrix(source.id));
             const allMeshIds = new Set();
             const visibleMeshIds = new Set();
+            // Liên kết thép bị xuất trùng: bản sao không nạp vào scene (loader.js), đi theo bản giữ lại khi xóa / lọc
+            const duplicateIdsById = new Map();
             const sourceMeshes = rt.modelGroup.children.filter(mesh => mesh.isMesh && mesh.userData.sourceId === source.id);
             sourceMeshes.forEach(mesh => {
                 const id = mesh.userData.expressID;
                 allMeshIds.add(id);
+                if (mesh.userData.duplicateExpressIDs?.length) duplicateIdsById.set(id, mesh.userData.duplicateExpressIDs);
                 if (mesh.visible && !pendingDeletedExpressIDs.has(getMeshKey(mesh))) visibleMeshIds.add(id);
             });
 
             const idsToDelete = new Set();
+            const deleteWithDuplicates = (id) => {
+                idsToDelete.add(id);
+                (duplicateIdsById.get(id) || []).forEach(duplicateId => idsToDelete.add(duplicateId));
+            };
             if (mode === 'edited' || mode === 'visible') {
-                deletedItems.value.filter(item => item.sourceId === source.id).forEach(item => idsToDelete.add(item.expressID));
+                deletedItems.value.filter(item => item.sourceId === source.id).forEach(item => deleteWithDuplicates(item.expressID));
             }
             if (mode === 'visible') {
                 allMeshIds.forEach(id => {
-                    if (!visibleMeshIds.has(id)) idsToDelete.add(id);
+                    if (!visibleMeshIds.has(id)) deleteWithDuplicates(id);
                 });
             }
 

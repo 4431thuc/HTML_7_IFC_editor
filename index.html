@@ -1013,6 +1013,10 @@
                         <div class="rounded-lg border border-slate-800 bg-slate-900 p-2"><div class="text-[10px] text-slate-500">{{ t('Cặp xung đột') }}</div><div class="text-lg font-bold text-blue-300">{{ clashCount }}</div></div>
                         <div class="rounded-lg border border-slate-800 bg-slate-900 p-2"><div class="text-[10px] text-slate-500">{{ t('Thể tích giao nhau') }}</div><div class="text-lg font-bold text-blue-300">{{ clashVolume.toFixed(4) }} m³</div></div>
                     </div>
+                    <div v-if="clashResultsReady && (clashConnectorCount || clashDuplicateCount)" class="rounded-lg border border-slate-800 bg-slate-900 p-2 text-[10px] leading-relaxed text-slate-400 space-y-0.5">
+                        <div v-if="clashDuplicateCount" class="font-semibold text-orange-300"><i class="ph-bold ph-copy"></i> {{ t('{0} cặp thép trùng lặp (xếp đầu danh sách)', [clashDuplicateCount]) }}</div>
+                        <div v-if="clashConnectorCount"><i class="ph-bold ph-link"></i> {{ t('{0} liên kết thép (coupler, đầu ren): bỏ qua {1} cặp liên kết ↔ thép chủ', [clashConnectorCount, clashSkippedConnectionPairs]) }}</div>
+                    </div>
                     <div v-if="clashError" class="rounded-lg border border-rose-800/60 bg-rose-950/30 p-2 text-[10px] text-rose-300">{{ clashError }}</div>
                     <div v-if="clashModeActive" class="space-y-1.5">
                         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-slate-300">
@@ -1030,11 +1034,12 @@
                     </div>
                 </div>
                 <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
-                    <div v-if="clashItems.length" class="px-1 pb-1 text-[9px] text-slate-500">{{ t('Sắp xếp theo thể tích giao nhau: lớn nhất ở trên') }}</div>
+                    <div v-if="clashItems.length" class="px-1 pb-1 text-[9px] text-slate-500">{{ clashDuplicateCount ? t('Thép trùng lặp ở trên cùng, còn lại theo thể tích giao nhau: lớn nhất ở trên') : t('Sắp xếp theo thể tích giao nhau: lớn nhất ở trên') }}</div>
                     <button v-for="(item, index) in clashItems" :key="item.id" :data-clash-id="item.id" @click="zoomToClash(item)"
-                        :class="selectedClashId === item.id ? 'border-amber-400 bg-amber-950/40 ring-1 ring-amber-500/60' : 'border-slate-800 bg-slate-800/30 hover:border-blue-500/70 hover:bg-blue-950/30'"
+                        :class="selectedClashId === item.id ? 'border-amber-400 bg-amber-950/40 ring-1 ring-amber-500/60' : (item.duplicate ? 'border-orange-700/70 bg-orange-950/20 hover:border-orange-500 hover:bg-orange-950/40' : 'border-slate-800 bg-slate-800/30 hover:border-blue-500/70 hover:bg-blue-950/30')"
                         class="w-full rounded-lg border p-2 text-left text-[10px] transition focus:outline-none focus:ring-1 focus:ring-amber-400">
                         <div class="flex items-center justify-between gap-2"><span class="font-semibold" :class="selectedClashId === item.id ? 'text-amber-300' : 'text-red-300'">{{ t('Va chạm #{0}', [index + 1]) }}</span><span class="text-slate-400">{{ formatClashVolume(item.volume) }}</span></div>
+                        <div v-if="item.duplicate" class="mt-1 inline-flex items-center gap-1 rounded border border-orange-500/60 bg-orange-950/60 px-1.5 py-0.5 text-[9px] font-semibold text-orange-300"><i class="ph-bold ph-copy"></i>{{ formatClashDuplicate(item) }}</div>
                         <div class="mt-1 flex items-center gap-1.5 text-slate-200"><span class="w-2 h-2 rounded-sm bg-blue-500 shrink-0"></span>{{ describeClashElement(item.sourceA) }}</div>
                         <div class="flex items-center gap-1.5 text-slate-200"><span class="w-2 h-2 rounded-sm bg-purple-500 shrink-0"></span>{{ describeClashElement(item.sourceB) }}</div>
                         <div class="mt-1 text-[9px] text-slate-500">{{ t('{0} ↔ {1} · Bấm để zoom vùng clash', [item.typeA, item.typeB]) }}</div>

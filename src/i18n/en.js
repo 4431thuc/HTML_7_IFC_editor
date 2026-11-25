@@ -602,5 +602,15 @@ export const EN = {
     'Cấu kiện có va chạm': 'Clashing elements',
     'Mô hình nền (mờ)': 'Model (ghosted)',
     'Ẩn thép không có va chạm': 'Hide rebars without clashes',
-    'Va chạm #{0}: {1} ↔ {2}': 'Clash #{0}: {1} ↔ {2}'
+    'Va chạm #{0}: {1} ↔ {2}': 'Clash #{0}: {1} ↔ {2}',
+    // --- Liên kết thép (coupler, đầu ren) & thép trùng lặp ---
+    'Trùng lặp': 'Duplicate',
+    'Trùng lặp (nhóm thanh)': 'Duplicate (bar group)',
+    '{0} cặp thép trùng lặp xếp đầu danh sách.': '{0} duplicate rebar pairs are listed first.',
+    'Bỏ qua {0} cặp liên kết ↔ thép chủ.': 'Skipped {0} connector ↔ host bar pairs.',
+    '{0} cặp thép trùng lặp (xếp đầu danh sách)': '{0} duplicate rebar pairs (listed first)',
+    '{0} liên kết thép (coupler, đầu ren): bỏ qua {1} cặp liên kết ↔ thép chủ': '{0} rebar connectors (couplers, threaded ends): skipped {1} connector ↔ host bar pairs',
+    'Thép trùng lặp ở trên cùng, còn lại theo thể tích giao nhau: lớn nhất ở trên': 'Duplicate rebars first, then by intersection volume: largest first',
+    'Nhận diện liên kết thép (coupler, đầu ren)...': 'Detecting rebar connectors (couplers, threaded ends)...',
+    'Đã gộp {0} liên kết thép bị xuất trùng (chỉ hiện một).': 'Merged {0} duplicated rebar connectors (only one is shown).'
 };

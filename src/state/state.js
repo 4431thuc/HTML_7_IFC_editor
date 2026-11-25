@@ -92,6 +92,11 @@ export const clashCount = ref(0);
 export const clashVolume = ref(0);
 export const clashError = ref('');
 export const clashItems = ref([]);
+// Kết quả phụ của lần kiểm tra: số cặp thép trùng lặp (xếp đầu danh sách), số cặp liên kết ↔ thép chủ đã bỏ qua,
+// số cấu kiện liên kết thép (coupler, đầu ren...) nhận diện được (src/ifc/rebar-connections.js)
+export const clashDuplicateCount = ref(0);
+export const clashSkippedConnectionPairs = ref(0);
+export const clashConnectorCount = ref(0);
 export const selectedClashId = ref(null);
 // --- ĐO ĐẠC (DIMENSION): mỗi nhóm gồm 2 điểm world (mét) và khoảng cách giữa chúng ---
 export const dimModeActive = ref(false);

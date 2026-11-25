@@ -5,7 +5,8 @@ import { getMeshKey, getObjectMeshes, requestRender } from '../core/helpers.js';
 import { refreshBatchMaterials } from '../scene/rendering.js';
 import { clearSelection } from '../selection/selection.js';
 import { getEntityLabel } from '../ifc/groups.js';
-import { batchGroup, clashAnnotationGroup, clashCancelPrompt, clashResultsReady, clashVolumeMaterial, clashFlashMaterial, clashHideOtherRebar, clashInvolvedMaterial, CLASH_GHOST_LAYER, clashBusy, clashContextGroup, clashContextMaterial, clashCount, clashError, clashGroup, clashItems, clashModeActive, clashOutlineMaterial, clashPairGroup, clashPairMaterialA, clashPairMaterialB, clashProgress, clashSelectionGroup, clashToleranceMm, clashTypeA, clashTypeB, clashVolume, clashYellowMaterial, edgesGroup, isOrthographic, overlayGroup, pendingDeletedExpressIDs, rt, selectedClashId, selectionOutlineMaterial, showClashPairObjects, showEdges } from '../state/state.js';
+import { buildConnectionIndex, isBarMesh } from '../ifc/rebar-connections.js';
+import { batchGroup, clashAnnotationGroup, clashCancelPrompt, clashConnectorCount, clashDuplicateCount, clashResultsReady, clashSkippedConnectionPairs, clashVolumeMaterial, clashFlashMaterial, clashHideOtherRebar, clashInvolvedMaterial, CLASH_GHOST_LAYER, clashBusy, clashContextGroup, clashContextMaterial, clashCount, clashError, clashGroup, clashItems, clashModeActive, clashOutlineMaterial, clashPairGroup, clashPairMaterialA, clashPairMaterialB, clashProgress, clashSelectionGroup, clashToleranceMm, clashTypeA, clashTypeB, clashVolume, clashYellowMaterial, edgesGroup, isOrthographic, overlayGroup, pendingDeletedExpressIDs, rt, selectedClashId, selectionOutlineMaterial, showClashPairObjects, showEdges } from '../state/state.js';
 import { applyModelOpacityToScene, showToast } from '../ui/panels.js';
 import { t } from '../i18n/index.js';
 
@@ -150,10 +151,18 @@ export const formatClashVolume = (cubicMeters) => {
     return `${(cubicMeters * 1000).toFixed(2)} dm³`;
 };
 
+// Ghi chú cặp thép trùng lặp (danh sách và nhãn va chạm): '' nếu không trùng
+export const formatClashDuplicate = (item) => {
+    if (!item?.duplicate) return '';
+    const label = item.duplicate.group ? t('Trùng lặp (nhóm thanh)') : t('Trùng lặp');
+    return `${label} ${Math.round(item.duplicate.ratio * 100)}%`;
+};
+
 const drawClashLabelTexture = (item, itemIndex) => {
     const scale = Math.max(2, Math.ceil(window.devicePixelRatio || 1));
     const rows = [
         { text: `${t('Va chạm #{0}', [itemIndex + 1])}  ·  ${formatClashVolume(item.volume)}`, bold: true, color: '#fde68a' },
+        ...(item.duplicate ? [{ text: `⚠ ${formatClashDuplicate(item)}`, bold: true, color: '#fb923c' }] : []),
         { text: `A: ${describeClashElement(item.sourceA)}`, swatch: PAIR_COLORS.A, color: '#e2e8f0' },
         { text: `B: ${describeClashElement(item.sourceB)}`, swatch: PAIR_COLORS.B, color: '#e2e8f0' }
     ];
@@ -171,7 +180,7 @@ const drawClashLabelTexture = (item, itemIndex) => {
     canvas.width = widthPx * scale;
     canvas.height = heightPx * scale;
     ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-    ctx.strokeStyle = '#facc15';
+    ctx.strokeStyle = item.duplicate ? '#fb923c' : '#facc15';
     ctx.lineWidth = 1.5 * scale;
     ctx.beginPath();
     ctx.roundRect(ctx.lineWidth / 2, ctx.lineWidth / 2, canvas.width - ctx.lineWidth, canvas.height - ctx.lineWidth, 6 * scale);
@@ -449,6 +458,9 @@ export const clearClashResults = () => {
     clashVolume.value = 0;
     clashItems.value = [];
     clashError.value = '';
+    clashDuplicateCount.value = 0;
+    clashSkippedConnectionPairs.value = 0;
+    clashConnectorCount.value = 0;
     refreshBatchMaterials();
     applyModelOpacityToScene();
     applyClashDisplayMode();
@@ -493,6 +505,131 @@ export const zoomToClash = (item) => {
     rt.controls.update();
     requestRender();
 };
+
+// Thể tích có dấu của geometry (hệ local), nhân |det| ma trận world ra m³
+const geometrySignedVolume = (geometry) => {
+    const position = geometry.attributes.position;
+    const index = geometry.index;
+    const triangleCount = index ? index.count / 3 : position.count / 3;
+    const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3(), cross = new THREE.Vector3();
+    let signedVolume = 0;
+    for (let triangle = 0; triangle < triangleCount; triangle++) {
+        va.fromBufferAttribute(position, index ? index.getX(triangle * 3) : triangle * 3);
+        vb.fromBufferAttribute(position, index ? index.getX(triangle * 3 + 1) : triangle * 3 + 1);
+        vc.fromBufferAttribute(position, index ? index.getX(triangle * 3 + 2) : triangle * 3 + 2);
+        signedVolume += va.dot(cross.crossVectors(vb, vc)) / 6;
+    }
+    return signedVolume;
+};
+
+// web-ifc dựng thanh thép (IfcSweptDiskSolid) thành ống HỞ hai đầu: thể tích tính theo mặt kín và phép giao CSG
+// đều sai (khối giao có thể lớn hơn cả thanh). Đóng nắp từng vòng biên hở bằng tam giác quạt quanh trọng tâm vòng,
+// đúng chiều với tam giác kề. Trả về true nếu đã thêm nắp (geometry dạng index, đổi tại chỗ).
+const capOpenBoundaries = (geometry) => {
+    const position = geometry.attributes.position;
+    if (!position || position.itemSize !== 3) return false;
+    if (!geometry.index) geometry.setIndex(Array.from({ length: position.count }, (_, i) => i));
+    const index = geometry.index.array;
+    // Hàn đỉnh trùng vị trí (web-ifc có thể tách đỉnh theo mặt) để tìm cạnh biên theo hình học
+    const weld = new Uint32Array(position.count);
+    const firstAt = new Map();
+    for (let i = 0; i < position.count; i++) {
+        const key = `${Math.round(position.getX(i) * 1e5)},${Math.round(position.getY(i) * 1e5)},${Math.round(position.getZ(i) * 1e5)}`;
+        if (!firstAt.has(key)) firstAt.set(key, i);
+        weld[i] = firstAt.get(key);
+    }
+    const edges = new Map();
+    for (let t = 0; t + 2 < index.length; t += 3) {
+        for (let k = 0; k < 3; k++) {
+            const a = index[t + k], b = index[t + (k + 1) % 3];
+            const wa = weld[a], wb = weld[b];
+            if (wa === wb) continue;
+            const key = wa < wb ? `${wa}_${wb}` : `${wb}_${wa}`;
+            const edge = edges.get(key);
+            if (edge) edge.count++;
+            else edges.set(key, { count: 1, a, b });
+        }
+    }
+    // Cạnh biên đi theo chiều tam giác a -> b; mỗi đỉnh biên chỉ được là điểm đầu của một cạnh (biên đa tạp)
+    const nextByStart = new Map();
+    for (const edge of edges.values()) {
+        if (edge.count !== 1) continue;
+        const start = weld[edge.a];
+        if (nextByStart.has(start)) return false;
+        nextByStart.set(start, edge);
+    }
+    if (nextByStart.size === 0) return false;
+    const capPositions = [];
+    const capIndices = [];
+    const visited = new Set();
+    let vertexCount = position.count;
+    nextByStart.forEach((edge, start) => {
+        if (visited.has(start)) return;
+        const loop = [];
+        let current = start;
+        while (!visited.has(current)) {
+            visited.add(current);
+            const step = nextByStart.get(current);
+            if (!step) return;
+            loop.push(step);
+            current = weld[step.b];
+        }
+        if (current !== start || loop.length < 3) return;
+        let cx = 0, cy = 0, cz = 0;
+        loop.forEach(step => { cx += position.getX(step.a); cy += position.getY(step.a); cz += position.getZ(step.a); });
+        const centerIndex = vertexCount++;
+        capPositions.push(cx / loop.length, cy / loop.length, cz / loop.length);
+        // Tam giác nắp đi cạnh biên theo chiều ngược (b -> a) để pháp tuyến cùng hướng với mặt bên
+        loop.forEach(step => capIndices.push(centerIndex, step.b, step.a));
+    });
+    if (capIndices.length === 0) return false;
+    const merged = new Float32Array(vertexCount * 3);
+    for (let i = 0; i < position.count; i++) {
+        merged[i * 3] = position.getX(i);
+        merged[i * 3 + 1] = position.getY(i);
+        merged[i * 3 + 2] = position.getZ(i);
+    }
+    merged.set(capPositions, position.count * 3);
+    geometry.setAttribute('position', new THREE.BufferAttribute(merged, 3));
+    geometry.deleteAttribute('normal');
+    const indexArray = new Uint32Array(index.length + capIndices.length);
+    indexArray.set(index);
+    indexArray.set(capIndices, index.length);
+    geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
+    geometry.computeVertexNormals();
+    return true;
+};
+
+// --- THÉP TRÙNG LẶP ---
+// Hai thanh trùng nhau khi phần giao chiếm >= 90% thể tích CẢ HAI thanh. Nhóm thanh: một thanh bị nhiều thanh
+// khác phủ (mỗi cặp phủ >= 50% thanh nhỏ hơn) và tổng phần bị phủ của cả hai phía đều >= 90%
+// (ví dụ một thanh dài vẽ chồng lên hai thanh ngắn nối tiếp nhau).
+const DUPLICATE_VOLUME_RATIO = 0.9;
+const DUPLICATE_GROUP_PAIR_RATIO = 0.5;
+const markDuplicateBars = (items) => {
+    const coverage = new Map();
+    const ratiosOf = (item) => [item.volume / item.volumeA, item.volume / item.volumeB];
+    items.forEach(item => {
+        if (!item.barPair || item.sameElement) return;
+        const [ratioA, ratioB] = ratiosOf(item);
+        if (Math.max(ratioA, ratioB) < DUPLICATE_GROUP_PAIR_RATIO) return;
+        coverage.set(item.sourceA, (coverage.get(item.sourceA) || 0) + ratioA);
+        coverage.set(item.sourceB, (coverage.get(item.sourceB) || 0) + ratioB);
+    });
+    items.forEach(item => {
+        if (!item.barPair || !(item.volumeA > 0) || !(item.volumeB > 0)) return;
+        const [ratioA, ratioB] = ratiosOf(item);
+        const direct = Math.min(ratioA, ratioB);
+        if (direct >= DUPLICATE_VOLUME_RATIO) {
+            item.duplicate = { ratio: Math.min(direct, 1), group: false };
+            return;
+        }
+        if (item.sameElement || Math.max(ratioA, ratioB) < DUPLICATE_GROUP_PAIR_RATIO) return;
+        const groupRatio = Math.min(coverage.get(item.sourceA) || 0, coverage.get(item.sourceB) || 0);
+        if (groupRatio >= DUPLICATE_VOLUME_RATIO) item.duplicate = { ratio: Math.min(groupRatio, 1), group: true };
+    });
+};
+
 export const runClashCheck = async () => {
     if (clashBusy.value) return;
     const candidates = rt.modelGroup.children.filter(mesh =>
@@ -517,6 +654,9 @@ export const runClashCheck = async () => {
         clashItems.value = [];
         clashCount.value = 0;
         clashVolume.value = 0;
+        clashDuplicateCount.value = 0;
+        clashSkippedConnectionPairs.value = 0;
+        clashConnectorCount.value = 0;
         clashModeActive.value = false;
         clashResultsReady.value = false;
         applyClashDisplayMode();
@@ -535,16 +675,30 @@ export const runClashCheck = async () => {
             if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
             const box = mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld);
             if (halfTolerance > 0) box.expandByScalar(halfTolerance);
-            return { mesh, box };
+            return { mesh, box, key: getMeshKey(mesh), isBar: isBarMesh(mesh) };
         });
+        // Liên kết thép (coupler, đầu ren...) và thép chủ của nó, theo vị trí hiện tại (kể cả sau transport)
+        const connections = buildConnectionIndex(candidates);
+        // null: không xét; 'connection': liên kết ↔ thép chủ (bỏ qua); 'same-element': hai thanh cùng một cấu kiện
+        // IFC (trước đây luôn bỏ qua, nay chỉ giữ nếu trùng lặp); 'check': kiểm tra bình thường
+        const classifyPair = (a, b) => {
+            const sameElement = a.key === b.key;
+            if (sameElement && !(a.isBar && b.isBar)) return null;
+            if (!pairMatchesTypes(a.mesh, b.mesh) || !a.box.intersectsBox(b.box)) return null;
+            if (sameElement) return 'same-element';
+            return connections.shouldSkipPair(a.mesh, b.mesh) ? 'connection' : 'check';
+        };
         const evaluator = new Evaluator();
         evaluator.useGroups = false;
         evaluator.attributes = ['position', 'normal'];
         const brushCache = new Map();
+        // Thể tích từng cấu kiện (đã nới dung sai, cùng hệ với khối giao) để xét thép trùng lặp
+        const brushVolumes = new Map();
         const makeBrush = (mesh) => {
             let brush = brushCache.get(mesh);
             if (brush) return brush;
             const geometry = mesh.geometry.clone();
+            if (isBarMesh(mesh)) capOpenBoundaries(geometry);
             if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
             if (halfTolerance > 0) {
                 // Nới từng bề mặt ra 1/2 dung sai để bắt cả khe hở nhỏ trong giới hạn cho phép.
@@ -571,15 +725,18 @@ export const runClashCheck = async () => {
             brush.matrix.copy(mesh.matrixWorld);
             brush.updateMatrixWorld(true);
             brushCache.set(mesh, brush);
+            if (isBarMesh(mesh)) brushVolumes.set(mesh, Math.abs(geometrySignedVolume(geometry)) * Math.abs(mesh.matrixWorld.determinant()));
             return brush;
         };
         const found = [];
         let checked = 0;
         let totalPairs = 0;
+        let skippedConnectionPairs = 0;
         for (let i = 0; i < entries.length; i++) {
             for (let j = i + 1; j < entries.length; j++) {
-                const a = entries[i], b = entries[j];
-                if (getMeshKey(a.mesh) !== getMeshKey(b.mesh) && pairMatchesTypes(a.mesh, b.mesh) && a.box.intersectsBox(b.box)) totalPairs++;
+                const state = classifyPair(entries[i], entries[j]);
+                if (state === 'connection') skippedConnectionPairs++;
+                else if (state) totalPairs++;
             }
         }
         for (let i = 0; i < entries.length; i++) {
@@ -588,7 +745,8 @@ export const runClashCheck = async () => {
             for (let j = i + 1; j < entries.length; j++) {
                 const b = entries[j];
                 if (rt.clashCancelRequested) break;
-                if (getMeshKey(a.mesh) === getMeshKey(b.mesh) || !pairMatchesTypes(a.mesh, b.mesh) || !a.box.intersectsBox(b.box)) continue;
+                const pairState = classifyPair(a, b);
+                if (!pairState || pairState === 'connection') continue;
                 checked++;
                 clashProgress.value = checked / Math.max(totalPairs, 1);
                 if (checked % 20 === 0) await new Promise(resolve => setTimeout(resolve, 0));
@@ -601,22 +759,8 @@ export const runClashCheck = async () => {
                         continue;
                     }
                     result.updateMatrixWorld(true);
-                    const position = geometry.attributes.position;
-                    const index = geometry.index;
-                    let signedVolume = 0;
-                    const triangleCount = index ? index.count / 3 : position.count / 3;
-                    const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3();
-                    for (let triangle = 0; triangle < triangleCount; triangle++) {
-                        const ia = index ? index.getX(triangle * 3) : triangle * 3;
-                        const ib = index ? index.getX(triangle * 3 + 1) : triangle * 3 + 1;
-                        const ic = index ? index.getX(triangle * 3 + 2) : triangle * 3 + 2;
-                        va.fromBufferAttribute(position, ia);
-                        vb.fromBufferAttribute(position, ib);
-                        vc.fromBufferAttribute(position, ic);
-                        signedVolume += va.dot(vb.clone().cross(vc)) / 6;
-                    }
                     const transformScale = Math.abs(result.matrixWorld.determinant());
-                    const intersectionVolume = Math.abs(signedVolume) * transformScale;
+                    const intersectionVolume = Math.abs(geometrySignedVolume(geometry)) * transformScale;
                     if (!Number.isFinite(intersectionVolume) || intersectionVolume < 1e-10) {
                         geometry.dispose();
                         continue;
@@ -635,6 +779,11 @@ export const runClashCheck = async () => {
                         typeA: a.mesh.userData.type || 'IFCELEMENT',
                         typeB: b.mesh.userData.type || 'IFCELEMENT',
                         volume: intersectionVolume,
+                        barPair: a.isBar && b.isBar,
+                        sameElement: pairState === 'same-element',
+                        volumeA: brushVolumes.get(a.mesh) || 0,
+                        volumeB: brushVolumes.get(b.mesh) || 0,
+                        duplicate: null,
                         mesh: markRaw(clashMesh),
                         sourceA: markRaw(a.mesh),
                         sourceB: markRaw(b.mesh),
@@ -662,14 +811,27 @@ export const runClashCheck = async () => {
             return;
         }
 
-        buildMergedClashDisplay(found, candidates);
+        markDuplicateBars(found);
+        // Hai thanh của cùng một cấu kiện IFC chỉ báo khi trùng lặp (chạm nhau thì không phải va chạm)
+        const results = found.filter(item => {
+            if (!item.sameElement || item.duplicate) return true;
+            item.mesh.geometry.dispose();
+            return false;
+        });
 
-        // Xếp cặp có thể tích giao lớn nhất lên đầu danh sách.
-        found.sort((a, b) => b.volume - a.volume);
-        clashItems.value = found;
-        clashCount.value = found.length;
+        buildMergedClashDisplay(results, candidates);
+
+        // Thép trùng lặp lên đầu danh sách (trùng nhiều hơn ở trên), còn lại theo thể tích giao lớn nhất.
+        results.sort((a, b) => (b.duplicate ? 1 : 0) - (a.duplicate ? 1 : 0)
+            || (b.duplicate?.ratio || 0) - (a.duplicate?.ratio || 0)
+            || b.volume - a.volume);
+        clashItems.value = results;
+        clashCount.value = results.length;
+        clashDuplicateCount.value = results.filter(item => item.duplicate).length;
+        clashSkippedConnectionPairs.value = skippedConnectionPairs;
+        clashConnectorCount.value = connections.connectorCount;
         // Tổng thể tích giao theo từng cặp cấu kiện (có thể đếm trùng nếu nhiều cấu kiện cùng giao một vùng).
-        clashVolume.value = found.reduce((sum, item) => sum + item.volume, 0);
+        clashVolume.value = results.reduce((sum, item) => sum + item.volume, 0);
         clearSelection();
         clashModeActive.value = true;
         clashResultsReady.value = true;
@@ -677,7 +839,10 @@ export const runClashCheck = async () => {
         applyModelOpacityToScene();
         applyClashDisplayMode();
         requestRender();
-        showToast(t('Hoàn tất kiểm tra Clash'), t('Phát hiện {0} cặp có vùng giao nhau.', [found.length]), 'success');
+        const summary = [t('Phát hiện {0} cặp có vùng giao nhau.', [results.length])];
+        if (clashDuplicateCount.value > 0) summary.push(t('{0} cặp thép trùng lặp xếp đầu danh sách.', [clashDuplicateCount.value]));
+        if (skippedConnectionPairs > 0) summary.push(t('Bỏ qua {0} cặp liên kết ↔ thép chủ.', [skippedConnectionPairs]));
+        showToast(t('Hoàn tất kiểm tra Clash'), summary.join(' '), 'success');
     } catch (error) {
         console.error('Clash check failed:', error);
         clashError.value = error?.message || t('Không thể hoàn tất kiểm tra clash.');

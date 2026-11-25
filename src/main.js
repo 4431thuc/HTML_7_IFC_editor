@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { computeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 import { createApp, nextTick, onBeforeUnmount, onMounted, watch } from 'vue';
-import { answerClashCancelPrompt, clearClashResults, onClashButtonClick, describeClashElement, formatClashVolume, requestClearClashResults, runClashCheck, toggleClashHideOtherRebar, toggleClashPairObjects, toggleClashView, zoomToClash } from './clash/clash.js';
+import { answerClashCancelPrompt, clearClashResults, onClashButtonClick, describeClashElement, formatClashDuplicate, formatClashVolume, requestClearClashResults, runClashCheck, toggleClashHideOtherRebar, toggleClashPairObjects, toggleClashView, zoomToClash } from './clash/clash.js';
 import { formatDimCoords, formatDimDistance, removeDimension, toggleDimensionMode, zoomToDimension } from './dimension/dimension.js';
 import { visibleExportItems } from './core/helpers.js';
 import { canRedo, canUndo, redo, redoLabel, undo, undoLabel } from './core/history.js';
@@ -19,7 +19,7 @@ import { clearSelection, isMeshManuallyHidden, isMeshPendingRemoval, isMeshSelec
 import { duplicateFilePrompt, currentProjectInfo, projectInfoDirty, projectInfoSourceId, allGroups, axisGizmoXLabel, axisGizmoXLine, axisGizmoXPoint, axisGizmoYLabel, axisGizmoYLine, axisGizmoYPoint, axisGizmoZLabel, axisGizmoZLine, axisGizmoZPoint, canvasContainer, clashBusy, clashCount, clashError, clashItems, clashModeActive, clashProgress, clashToleranceMm, clashTypeA, clashTypeB, clashVolume, contextMenu, deletedItems, dimItems, dimModeActive, deletedObjectCount, dontShowIntroAgain, editHistoryCount, editableAttributes, faultyCount, fileName, filterFaultyBars, groupCriterion, groupListContainer, groupSearchQuery, hasAttributeChanges, hasLoadedIfc, hasUnsavedChanges, hiddenObjectCount, hoveredType, introPanelContent, introPanelStorageKey, isBoxSelecting, isCropBoxActive, isEditingAttributes, isFlatShading, isIfcDragOver, isLightBackground, isLoading, isOrthographic, isRebarOnly, isSampleModel, isWireframe, isXRayMode, leftActiveTab, leftPanelWidth, lightExposure, lightPreset, loadingText, modelOpacityPercent, openFileCount, rightPanelWidth, rt, selectedClashId, selectedDimId, selectedMeshes, statusIndicator, selectedObject, selectionOutlineMaterial, selectionOutlines, showClashPairObjects, showEdges, showGrid, showIntroPanel, showLeftPanel, showOutsideCropEdges, showRightPanel, showTransportProfileModal, sourceFiles, stats, toastMessage, toastTitle, toastType, transportHistory, transportInnerTab, transportInputs, transportProfileName, transportProfileNameInput, transportProfiles, wasmReady, xrayOpacity } from './state/state.js';
 import { hoverViewDir, viewCubeEl } from './state/state.js';
 import { SHOW_BAR_SCHEDULE_TAB, VIEW_CUBE_FACES } from './state/constants.js';
-import { clashCancelPrompt, clashHideOtherRebar, clashResultsReady } from './state/state.js';
+import { clashCancelPrompt, clashConnectorCount, clashDuplicateCount, clashHideOtherRebar, clashResultsReady, clashSkippedConnectionPairs } from './state/state.js';
 import { applyGroupColorScheme, openGroupTabMenu, resetGroupColorScheme } from './ifc/color-scheme.js';
 import { closeContextMenu, contextMenuAction, handleContextMenuEscape, handleContextMenuOutsidePointer, openContextMenu } from './ui/context-menu.js';
 import { adjustPanelWidth, boxSelectionStyle, closeIntroPanel, endPanelResize, persistModelOpacity, playUiPop, startPanelResize, togglePropertiesPanel, updateModelOpacity, updatePanelResize } from './ui/panels.js';
@@ -171,6 +171,10 @@ createApp({
             clashHideOtherRebar,
             describeClashElement,
             formatClashVolume,
+            formatClashDuplicate,
+            clashDuplicateCount,
+            clashSkippedConnectionPairs,
+            clashConnectorCount,
             toggleClashHideOtherRebar,
             clashCancelPrompt,
             toggleClashView,
