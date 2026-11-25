@@ -1,12 +1,13 @@
 import * as WebIFC from 'web-ifc';
 import { computed } from 'vue';
 import { getMeshKey, getPsetCacheKey, requestRender } from '../core/helpers.js';
+import { pushHistory } from '../core/history.js';
 import { ensureEdgesForVisibleMeshes } from '../scene/display.js';
 import { ensureIntersectionEdges } from '../scene/intersections.js';
 import { getRebarColorByDiameter } from '../scene/sample-model.js';
 import { clearSelection, updateSelectionOutlines } from '../selection/selection.js';
 import { ENTITY_DEFAULT_COLORS, PALETTE } from '../state/constants.js';
-import { allGroups, clashModeActive, deletedItems, edgesGroup, editHistoryCount, exportListVersion, filterFaultyBars, groupCriterion, groupSearchQuery, hasUnsavedChanges, isRebarOnly, manuallyHiddenExpressIDs, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes, showEdges } from '../state/state.js';
+import { allGroups, barScheduleStale, clashModeActive, deletedItems, edgesGroup, exportListVersion, filterFaultyBars, groupCriterion, groupSearchQuery, isRebarOnly, manuallyHiddenExpressIDs, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes, showEdges } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
 import { t } from '../i18n/index.js';
 
@@ -62,6 +63,8 @@ export const indexAllPropertySets = (modelID, sourceId) => {
 
 // --- 5. TỔ CHỨC CÁC BỘ NHÓM (GROUPS) ---
 export const buildAllGroupingCollections = () => {
+    // Pos / Ø / danh sách thép có thể đã đổi: bảng thống kê thép cần lập lại
+    barScheduleStale.value = true;
     const groupBuilders = {
         pos: new Map(),
         name: new Map(),
@@ -337,23 +340,40 @@ export const queueSelectedForRemoval = () => {
             });
         }
     });
-    itemsById.forEach(item => {
-        if (!pendingDeletedExpressIDs.has(item.key)) {
-            pendingDeletedExpressIDs.add(item.key);
-            deletedItems.value.push(item);
-        }
-    });
-    if (itemsById.size > 0) hasUnsavedChanges.value = true;
-    updateAllMeshesVisibility();
+    const added = Array.from(itemsById.values()).filter(item => !pendingDeletedExpressIDs.has(item.key));
+    addRemovedItems(added);
     clearSelection();
+    if (added.length > 0) {
+        pushHistory({
+            label: t('Đánh dấu xóa {0} cấu kiện', [added.length]),
+            undo: () => dropRemovedItems(added.map(item => item.key)),
+            redo: () => addRemovedItems(added)
+        });
+    }
     showToast(t('Đã đánh dấu xóa'), t('{0} cấu kiện sẽ bị xóa khi xuất IFC.', [itemsById.size]), 'success');
 };
 
-export const restoreRemovedItem = (key) => {
-    pendingDeletedExpressIDs.delete(key);
-    deletedItems.value = deletedItems.value.filter(item => item.key !== key);
-    if (deletedItems.value.length === 0 && editHistoryCount.value === 0) {
-        hasUnsavedChanges.value = false;
-    }
+// Thêm / gỡ khỏi danh sách xóa (dùng chung cho thao tác, hoàn tác và làm lại)
+const addRemovedItems = (items) => {
+    const fresh = items.filter(item => !pendingDeletedExpressIDs.has(item.key));
+    fresh.forEach(item => pendingDeletedExpressIDs.add(item.key));
+    if (fresh.length > 0) deletedItems.value = [...deletedItems.value, ...fresh];
     updateAllMeshesVisibility();
+};
+const dropRemovedItems = (keys) => {
+    const keySet = new Set(keys);
+    keySet.forEach(key => pendingDeletedExpressIDs.delete(key));
+    deletedItems.value = deletedItems.value.filter(item => !keySet.has(item.key));
+    updateAllMeshesVisibility();
+};
+
+export const restoreRemovedItem = (key) => {
+    const item = deletedItems.value.find(entry => entry.key === key);
+    if (!item) return;
+    dropRemovedItems([key]);
+    pushHistory({
+        label: t('Khôi phục "{0}"', [item.name]),
+        undo: () => addRemovedItems([item]),
+        redo: () => dropRemovedItems([key])
+    });
 };

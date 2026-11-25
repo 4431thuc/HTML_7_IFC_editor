@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { getMeshKey, getObjectMeshes, requestRender } from '../core/helpers.js';
+import { redo, undo } from '../core/history.js';
+import { pickClashItem, selectClashFromView } from '../clash/clash.js';
 import { queueSelectedForRemoval, toggleSelectedVisibility, updateEdgesVisibility } from '../ifc/groups.js';
 import { clearCropHandleHover, cropHandleWorldUnitsPerPixel, syncCropBoxGeometryAndPlanes, toggleCropBox, updateCropHandleHover, updateCropHandleScales } from '../scene/cropbox.js';
 import { cancelPendingDimension, clearDimensionHover, handleDimensionClick, toggleDimensionMode, updateDimensionHover } from '../dimension/dimension.js';
@@ -25,7 +27,8 @@ export const isPointInsideCropBounds = (point) => {
         && point.z >= cropBounds.minZ - tolerance && point.z <= cropBounds.maxZ + tolerance;
 };
 
-export const getVisibleModelIntersections = () => {
+// firstHitOnly: chỉ cần điểm gần nhất (tâm xoay, hover) -> BVH dừng ở giao điểm đầu tiên của mỗi cấu kiện
+export const getVisibleModelIntersections = (firstHitOnly = false) => {
     if (clashModeActive.value) {
         // Khi đang xem kết quả clash, batch/overlay đang ẩn: pick trực tiếp vào các cấu kiện thật (layer 1).
         const candidates = rt.modelGroup.children.filter(mesh =>
@@ -33,7 +36,10 @@ export const getVisibleModelIntersections = () => {
         );
         const previousLayers = raycaster.layers.mask;
         raycaster.layers.set(1);
+        // CropBox: giao điểm đầu tiên có thể nằm trong phần bị cắt, phải xét đủ các giao điểm
+        raycaster.firstHitOnly = firstHitOnly && !isCropBoxActive.value;
         const clashHits = raycaster.intersectObjects(candidates, false);
+        raycaster.firstHitOnly = false;
         raycaster.layers.mask = previousLayers;
         return clashHits.filter(hit => isPointInsideCropBounds(hit.point));
     }
@@ -108,7 +114,7 @@ export const onPointerDown = (event) => {
         if (!isLoading.value && rt.modelGroup.children.length > 0) {
             updateMouseCoords(event);
             raycaster.setFromCamera(mouse, rt.camera);
-            const pivotHits = getVisibleModelIntersections();
+            const pivotHits = getVisibleModelIntersections(true);
             if (pivotHits.length > 0) {
                 rt.orbitPivot = pivotHits[0].point.clone();
                 resetOrbitPivotTracking();
@@ -179,9 +185,35 @@ export const onPointerMove = (event) => {
     }
 
     if (isLoading.value || rt.modelGroup.children.length === 0 || rt.isMiddleMouseDown || rt.isOrbiting) return;
+    // Đang giữ nút chuột (pan chuột phải/giữa, xoay): không dò hover, mỗi lần dò là một raycast toàn mô hình
+    if (event.buttons !== 0) return;
+    // Hover chỉ dò tối đa 1 lần mỗi khung hình (pointermove có thể bắn nhiều lần/khung)
+    rt.pendingHoverEvent = { clientX: event.clientX, clientY: event.clientY };
+    if (rt.hoverFrameRequested) return;
+    rt.hoverFrameRequested = true;
+    requestAnimationFrame(processPendingHover);
+};
+
+// Vừa lăn chuột zoom thì bỏ qua hover một lúc: camera đang đổi liên tục, dò hover chỉ làm chậm khung hình
+const WHEEL_HOVER_PAUSE_MS = 250;
+export const onCanvasWheel = () => { rt.lastWheelTime = performance.now(); };
+
+const processPendingHover = () => {
+    rt.hoverFrameRequested = false;
+    const event = rt.pendingHoverEvent;
+    rt.pendingHoverEvent = null;
+    if (!event || isLoading.value || rt.isMiddleMouseDown || rt.isOrbiting || isBoxSelecting.value || rt.cropDragHandle) return;
+    if (performance.now() - (rt.lastWheelTime || 0) < WHEEL_HOVER_PAUSE_MS) return;
+    // View va chạm: không tô hover cấu kiện (overlay đang ẩn), đỡ một lượt raycast mỗi lần rê chuột
+    if (clashModeActive.value && !dimModeActive.value) {
+        hoveredType.value = '';
+        rt.renderer.domElement.style.cursor = 'default';
+        return;
+    }
     updateMouseCoords(event);
     raycaster.setFromCamera(mouse, rt.camera);
-    const intersects = getVisibleModelIntersections();
+    // Chế độ đo cần cả danh sách giao điểm để bắt điểm; hover thường chỉ cần điểm gần nhất
+    const intersects = getVisibleModelIntersections(!dimModeActive.value);
 
     if (rt.hoveredMesh && !isMeshSelected(rt.hoveredMesh)) {
         restoreMeshMaterial(rt.hoveredMesh);
@@ -244,6 +276,13 @@ export const onPointerUp = (event) => {
 
     updateMouseCoords(event);
     raycaster.setFromCamera(mouse, rt.camera);
+
+    // View va chạm: click chỉ chọn khối va chạm; trúng nền / cấu kiện thì bỏ chọn
+    if (clashModeActive.value && !dimModeActive.value) {
+        selectClashFromView(pickClashItem(raycaster));
+        return;
+    }
+
     const intersects = getVisibleModelIntersections();
 
     if (dimModeActive.value) {
@@ -263,6 +302,7 @@ export const onPointerUp = (event) => {
 
 export const onPointerLeave = () => {
     requestRender();
+    rt.pendingHoverEvent = null;
     if (rt.cropDragHandle) return;
     clearCropHandleHover();
     clearDimensionHover();
@@ -438,7 +478,18 @@ export const performBoxSelection = (start, end, isCtrl) => {
 export const handleKeyDown = (event) => {
     if (event.key === 'Shift') isShiftPressed.value = true;
     if (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) return;
-    if (!event.repeat && (event.key === 'c' || event.key === 'C')) {
+    // Ctrl+Z hoàn tác, Ctrl+Y / Ctrl+Shift+Z làm lại (thao tác ghi vào IFC)
+    if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+        const key = event.key.toLowerCase();
+        if (key === 'z' || key === 'y') {
+            event.preventDefault();
+            if (isLoading.value) return;
+            if (key === 'y' || event.shiftKey) redo();
+            else undo();
+            return;
+        }
+    }
+    if (!event.repeat && (event.key === 'c' || event.key === 'C') && !event.ctrlKey && !event.metaKey) {
         event.preventDefault();
         toggleCropBox();
     }

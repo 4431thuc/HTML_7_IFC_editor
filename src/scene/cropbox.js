@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { updateEdgesVisibility } from '../ifc/groups.js';
 import { updateMouseCoords } from '../selection/input.js';
-import { clippingPlanes, cropBounds, cropGroup, edgeCropUniforms, handleMeshes, isCropBoxActive, mouse, raycaster, rt, selectedMeshes, showOutsideCropEdges } from '../state/state.js';
+import { clashGhostDepthMaterial, clashGhostConcreteMaterial, clashGhostRebarMaterial, clashInvolvedMaterial, clashPairMaterialA, clashPairMaterialB, clippingPlanes, cropBounds, cropGroup, edgeCropUniforms, handleMeshes, isCropBoxActive, mouse, raycaster, rt, selectedMeshes, showOutsideCropEdges } from '../state/state.js';
 
 // --- 2.2 KHỞI TẠO CROPBOX 6 MẶT MŨI TÊN ĐỘC LẬP (CUSTOM DRAG – TẤT CẢ 6 MŨI TÊN ACTIVE CÙNG LÚC) ---
 export const init6FaceCropBox = () => {
@@ -277,5 +277,10 @@ export const applyClippingPlanesToMaterials = (enable) => {
             mesh.material.clippingPlanes = enable ? clippingPlanes : null;
             mesh.material.needsUpdate = true;
         }
+    });
+    // Vật liệu riêng của view va chạm (nền mờ, cấu kiện có va chạm, đối tượng A/B)
+    [clashGhostDepthMaterial, clashGhostConcreteMaterial, clashGhostRebarMaterial, clashInvolvedMaterial, clashPairMaterialA, clashPairMaterialB].forEach(material => {
+        material.clippingPlanes = enable ? clippingPlanes : null;
+        material.needsUpdate = true;
     });
 };

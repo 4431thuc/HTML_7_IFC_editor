@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { getObjectMeshes, getPsetCacheKey } from '../core/helpers.js';
+import { createIfcRecorder, pushHistory } from '../core/history.js';
 import { buildAllGroupingCollections } from '../ifc/groups.js';
-import { attributeBaseline, editHistoryCount, editableAttributes, hasAttributeChanges, hasUnsavedChanges, psetCache, rt, selectedMeshes, selectedObject } from '../state/state.js';
+import { attributeBaseline, editableAttributes, hasAttributeChanges, psetCache, rt, selectedMeshes, selectedObject } from '../state/state.js';
 import { showToast } from './panels.js';
 import { t } from '../i18n/index.js';
 
@@ -135,18 +136,36 @@ export const extractRebarSpecificDetails = (lineData, attributes, psets, dimensi
 };
 
 // LƯU THUỘC TÍNH VÀ XUẤT FILE
+const ATTRIBUTE_KEYS = ['Name', 'ObjectType', 'Tag', 'Description'];
+const USERDATA_KEYS = { Name: 'name', ObjectType: 'objectType', Tag: 'tag', Description: 'description' };
+const snapshotMeshAttributes = (meshes) => meshes.map(mesh => ({
+    mesh,
+    values: Object.fromEntries(ATTRIBUTE_KEYS.map(key => [key, mesh.userData[USERDATA_KEYS[key]]]))
+}));
+const restoreMeshAttributes = (snapshot) => {
+    snapshot.forEach(({ mesh, values }) => ATTRIBUTE_KEYS.forEach(key => { mesh.userData[USERDATA_KEYS[key]] = values[key]; }));
+    buildAllGroupingCollections();
+    if (selectedMeshes.value.length > 0) showPropertiesForMesh(selectedMeshes.value[selectedMeshes.value.length - 1]);
+};
+
 export const saveAttributeChanges = () => {
     if (!selectedObject.value || selectedMeshes.value.length === 0) return;
     if (!hasAttributeChanges.value) return;
 
-    selectedMeshes.value.forEach(mesh => {
+    const meshes = selectedMeshes.value.slice();
+    const before = snapshotMeshAttributes(meshes);
+    const rec = createIfcRecorder();
+    const writtenIds = new Set();
+    meshes.forEach(mesh => {
         const expressID = mesh.userData.expressID;
         mesh.userData.name = editableAttributes.Name;
         mesh.userData.objectType = editableAttributes.ObjectType;
         mesh.userData.tag = editableAttributes.Tag;
         mesh.userData.description = editableAttributes.Description;
 
-        if (mesh.userData.sourceModelID !== null && !mesh.userData.isDemo) {
+        const lineId = `${mesh.userData.sourceModelID}:${expressID}`;
+        if (mesh.userData.sourceModelID !== null && !mesh.userData.isDemo && !writtenIds.has(lineId)) {
+            writtenIds.add(lineId);
             try {
                 const line = rt.ifcAPI.GetLine(mesh.userData.sourceModelID, expressID, false);
                 if (line) {
@@ -154,10 +173,7 @@ export const saveAttributeChanges = () => {
                     if (editableAttributes.ObjectType) line.ObjectType = { type: 1, value: editableAttributes.ObjectType };
                     if (editableAttributes.Tag) line.Tag = { type: 1, value: editableAttributes.Tag };
                     if (editableAttributes.Description) line.Description = { type: 1, value: editableAttributes.Description };
-
-                    rt.ifcAPI.WriteLine(mesh.userData.sourceModelID, line);
-                    editHistoryCount.value++;
-                    hasUnsavedChanges.value = true;
+                    rec.write(mesh.userData.sourceModelID, line);
                 }
             } catch (err) {}
         }
@@ -167,9 +183,15 @@ export const saveAttributeChanges = () => {
     attributeBaseline.ObjectType = editableAttributes.ObjectType;
     attributeBaseline.Tag = editableAttributes.Tag;
     attributeBaseline.Description = editableAttributes.Description;
-    hasUnsavedChanges.value = true;
+    const ifcChange = rec.finish();
+    const after = snapshotMeshAttributes(meshes);
+    pushHistory({
+        label: t('Sửa thuộc tính ({0} cấu kiện)', [meshes.length]),
+        undo: () => { ifcChange.undo(); restoreMeshAttributes(before); },
+        redo: () => { ifcChange.redo(); restoreMeshAttributes(after); }
+    });
     buildAllGroupingCollections();
-    showToast(t('Đã lưu thuộc tính'), t('Đã cập nhật cho {0} đối tượng.', [selectedMeshes.value.length]), 'success');
+    showToast(t('Đã lưu thuộc tính'), t('Đã cập nhật cho {0} đối tượng.', [meshes.length]), 'success');
 };
 
 export const resetEditableAttributes = () => {

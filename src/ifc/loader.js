@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clearClashResults } from '../clash/clash.js';
 import { clearAllDimensions, syncDimensionsToModelFrame } from '../dimension/dimension.js';
 import { countLogicalObjects, createMeshKey, getMeshKey, getPsetCacheKey } from '../core/helpers.js';
+import { resetHistory } from '../core/history.js';
 import { buildAllGroupingCollections, indexAllPropertySets, shouldMeshBeVisible, updateAllMeshesVisibility, updateEdgesVisibility } from './groups.js';
 import { forgetSourceTransport, getIfcLengthUnitInMeters, resetTransportState, updateTransportScene } from './transport.js';
 import { resetCropBoxToModel } from '../scene/cropbox.js';
@@ -10,7 +11,7 @@ import { getRebarColorByDiameter } from '../scene/sample-model.js';
 import { fitCameraToModel } from '../scene/scene.js';
 import { clearSelection, updateSelectionDimmingEffect } from '../selection/selection.js';
 import { ENTITY_DEFAULT_COLORS, REBAR_ENTITY_TYPES, parseDiameterMm } from '../state/constants.js';
-import { duplicateFilePrompt, allGroups, batchGroup, clippingPlanes, deletedItems, edgesGroup, editHistoryCount, exportListVersion, faultyCount, fileName, hasLoadedIfc, hasUnsavedChanges, hoveredType, isCropBoxActive, isEditingAttributes, isIfcDragOver, isLoading, isSampleModel, isWireframe, loadingText, manuallyHiddenExpressIDs, materialCache, overlayGroup, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes, selectedObject, showEdges, sourceFiles, stats, toastMessage } from '../state/state.js';
+import { duplicateFilePrompt, clashResultsReady, allGroups, batchGroup, clippingPlanes, deletedItems, edgesGroup, exportListVersion, faultyCount, fileName, hasLoadedIfc, hoveredType, isCropBoxActive, isEditingAttributes, isIfcDragOver, isLoading, isSampleModel, isWireframe, loadingText, manuallyHiddenExpressIDs, materialCache, overlayGroup, pendingDeletedExpressIDs, psetCache, rt, selectedMeshes, selectedObject, showEdges, sourceFiles, stats, toastMessage } from '../state/state.js';
 import { applyModelOpacityToMaterial, showToast } from '../ui/panels.js';
 import { showPropertiesForMesh } from '../ui/properties.js';
 import { removeProjectInfo, showProjectInfoForSource } from './project-info.js';
@@ -95,8 +96,6 @@ export const loadIfcFile = async (file, replaceCurrent) => {
             sourceFiles.value = [];
             clearCurrentModel();
             psetCache.clear();
-            editHistoryCount.value = 0;
-            hasUnsavedChanges.value = false;
         }
 
         const uint8Array = new Uint8Array(await file.arrayBuffer());
@@ -282,6 +281,7 @@ export const toggleSourceVisibility = (source) => {
 };
 
 export const removeSourceFile = (source) => {
+    if (clashResultsReady.value) clearClashResults();
     const selectedFromSource = selectedMeshes.value.some(mesh => mesh.userData.sourceId === source.id);
     selectedMeshes.value = selectedMeshes.value.filter(mesh => mesh.userData.sourceId !== source.id);
     if (selectedFromSource) {
@@ -323,6 +323,8 @@ export const removeSourceFile = (source) => {
 
     removeProjectInfo(source.id);
     forgetSourceTransport(source.id);
+    // Lệnh hoàn tác cũ có thể trỏ vào file vừa đóng: bỏ hết, nhưng vẫn giữ trạng thái chưa lưu của các file còn lại
+    resetHistory({ keepDirty: sourceFiles.value.length > 1 });
     sourceFiles.value = sourceFiles.value.filter(item => item.id !== source.id);
     if (rt.currentModelID === source.modelID) rt.currentModelID = sourceFiles.value[0]?.modelID ?? null;
     try {
@@ -498,6 +500,7 @@ export const centerModelByBoundingBox = () => {
 };
 
 export const clearCurrentModel = () => {
+    resetHistory();
     clearClashResults();
     clearAllDimensions();
     clearSelection();

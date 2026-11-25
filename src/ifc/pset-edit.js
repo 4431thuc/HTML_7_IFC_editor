@@ -9,10 +9,11 @@
 import { nextTick } from 'vue';
 import * as WebIFC from 'web-ifc';
 import { getMeshKey, getPsetCacheKey } from '../core/helpers.js';
+import { createIfcRecorder, pushHistory } from '../core/history.js';
 import { rebuildBatches } from '../scene/rendering.js';
 import { getRebarColorByDiameter } from '../scene/sample-model.js';
 import { parseDiameterMm } from '../state/constants.js';
-import { editHistoryCount, hasUnsavedChanges, psetCache, psetEditDialog, rt, selectedMeshes } from '../state/state.js';
+import { psetCache, psetEditDialog, rt, selectedMeshes } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
 import { showPropertiesForMesh } from '../ui/properties.js';
 import { t } from '../i18n/index.js';
@@ -140,7 +141,7 @@ const updateCachedValue = (sourceId, propId, newPropId, displayValue) => {
 };
 
 // Sửa một nhóm cấu kiện cùng file, cùng thực thể pset
-const applyToPsetGroup = (modelID, sourceId, group, newValue, displayValue) => {
+const applyToPsetGroup = (rec, modelID, sourceId, group, newValue, displayValue) => {
     const { psetId } = group[0].entry;
     const propId = group[0].prop.propId;
     const selectedKeys = new Set(group.map(target => target.key));
@@ -151,7 +152,7 @@ const applyToPsetGroup = (modelID, sourceId, group, newValue, displayValue) => {
     // 1. Thuộc tính chỉ thuộc về các cấu kiện đang chọn: sửa tại chỗ
     if (isSubset(usage.props.get(propId), selectedKeys)) {
         propertyLine.NominalValue = nominalValue;
-        rt.ifcAPI.WriteLine(modelID, propertyLine);
+        rec.write(modelID, propertyLine);
         updateCachedValue(sourceId, propId, propId, displayValue);
         return;
     }
@@ -164,7 +165,7 @@ const applyToPsetGroup = (modelID, sourceId, group, newValue, displayValue) => {
         NominalValue: nominalValue,
         Unit: propertyLine.Unit ?? null
     });
-    rt.ifcAPI.WriteLine(modelID, newProperty);
+    rec.write(modelID, newProperty);
     const newPropId = newProperty.expressID;
     const psetLine = rt.ifcAPI.GetLine(modelID, psetId, false);
     const newPropertyRefs = (psetLine.HasProperties || []).map(ref => (ref.value === propId ? reference(newPropId) : ref));
@@ -172,7 +173,7 @@ const applyToPsetGroup = (modelID, sourceId, group, newValue, displayValue) => {
     // 2a. Pset chỉ thuộc về các cấu kiện đang chọn: trỏ pset sang thuộc tính mới
     if (isSubset(usage.psets.get(psetId), selectedKeys)) {
         psetLine.HasProperties = newPropertyRefs;
-        rt.ifcAPI.WriteLine(modelID, psetLine);
+        rec.write(modelID, psetLine);
         psetCache.forEach((entries, key) => {
             if (!key.startsWith(`${sourceId}:`)) return;
             entries.forEach(entry => {
@@ -196,7 +197,7 @@ const applyToPsetGroup = (modelID, sourceId, group, newValue, displayValue) => {
         Description: psetLine.Description ?? null,
         HasProperties: newPropertyRefs
     });
-    rt.ifcAPI.WriteLine(modelID, newPset);
+    rec.write(modelID, newPset);
 
     const selectedIds = new Set(group.map(target => target.expressID));
     const oldRelIds = new Set(group.map(target => target.entry.relId));
@@ -206,8 +207,8 @@ const applyToPsetGroup = (modelID, sourceId, group, newValue, displayValue) => {
         if (!relLine) return;
         ownerHistory = ownerHistory ?? relLine.OwnerHistory ?? null;
         relLine.RelatedObjects = (relLine.RelatedObjects || []).filter(ref => !selectedIds.has(ref.value));
-        if (relLine.RelatedObjects.length === 0) rt.ifcAPI.DeleteLine(modelID, relId);
-        else rt.ifcAPI.WriteLine(modelID, relLine);
+        if (relLine.RelatedObjects.length === 0) rec.delete(modelID, relId);
+        else rec.write(modelID, relLine);
     });
 
     const newRel = rt.ifcAPI.CreateIfcEntity(modelID, WebIFC.IFCRELDEFINESBYPROPERTIES);
@@ -219,7 +220,7 @@ const applyToPsetGroup = (modelID, sourceId, group, newValue, displayValue) => {
         RelatedObjects: Array.from(selectedIds, id => reference(id)),
         RelatingPropertyDefinition: reference(newPset.expressID)
     });
-    rt.ifcAPI.WriteLine(modelID, newRel);
+    rec.write(modelID, newRel);
 
     // Bộ nhớ đệm: các cấu kiện đang chọn chuyển sang pset mới (một mảng thuộc tính dùng chung cho cả nhóm)
     const newProperties = group[0].entry.properties.map(prop => (prop.propId === propId
@@ -266,6 +267,52 @@ const updateDerivedAttributes = (targets, propName, oldDisplay, newDisplay) => {
     return { regroup, recolor };
 };
 
+// --- HOÀN TÁC: chụp psetCache + thuộc tính suy ra trên mesh của các cấu kiện bị ảnh hưởng ---
+const cloneEntries = (entries) => entries.map(entry => ({ ...entry, properties: entry.properties.map(prop => ({ ...prop })) }));
+
+// Khóa cache có dùng pset/thuộc tính bị sửa (cấu kiện không chọn cũng bị đổi khi sửa tại chỗ) + các cấu kiện đang chọn
+const collectAffectedKeys = (targets) => {
+    const keys = new Set(targets.map(target => target.key));
+    const sourceIds = new Set(targets.map(target => target.sourceId));
+    const psetIds = new Set(targets.map(target => `${target.sourceId}|${target.entry.psetId}`));
+    const propIds = new Set(targets.map(target => `${target.sourceId}|${target.prop.propId}`));
+    psetCache.forEach((entries, key) => {
+        const sourceId = key.slice(0, key.lastIndexOf(':'));
+        if (!sourceIds.has(sourceId) || keys.has(key)) return;
+        if (entries.some(entry => psetIds.has(`${sourceId}|${entry.psetId}`) || entry.properties.some(prop => propIds.has(`${sourceId}|${prop.propId}`)))) keys.add(key);
+    });
+    return Array.from(keys);
+};
+
+const snapshotPsetState = (keys, targets) => ({
+    cache: keys.map(key => [key, cloneEntries(psetCache.get(key) || [])]),
+    meshes: targets.flatMap(target => (rt.meshesByKey?.get(target.key) || []).map(mesh => ({
+        mesh,
+        tag: mesh.userData.tag,
+        diameter: mesh.userData.diameter,
+        colorByDiameter: mesh.userData.colorByDiameter,
+        originalMaterial: mesh.userData.originalMaterial
+    })))
+});
+
+const restorePsetState = (snapshot) => {
+    snapshot.cache.forEach(([key, entries]) => psetCache.set(key, cloneEntries(entries)));
+    let recolor = false;
+    snapshot.meshes.forEach(item => {
+        const ud = item.mesh.userData;
+        if (ud.originalMaterial !== item.originalMaterial) {
+            recolor = true;
+            // Mesh đang mang material gốc (không phải hover/X-Ray...) thì đổi theo
+            if (item.mesh.material === ud.originalMaterial) item.mesh.material = item.originalMaterial;
+        }
+        Object.assign(ud, { tag: item.tag, diameter: item.diameter, colorByDiameter: item.colorByDiameter, originalMaterial: item.originalMaterial });
+    });
+    if (recolor) rebuildBatches();
+    buildAllGroupingCollections();
+    const last = selectedMeshes.value[selectedMeshes.value.length - 1];
+    if (last) showPropertiesForMesh(last);
+};
+
 export const applyPsetEdit = () => {
     const dialog = psetEditDialog;
     let newValue;
@@ -282,29 +329,45 @@ export const applyPsetEdit = () => {
         return;
     }
 
+    const rec = createIfcRecorder();
+    const targets = pendingTargets;
+    const affectedKeys = collectAffectedKeys(targets);
+    const before = snapshotPsetState(affectedKeys, targets);
     try {
         // Nhóm theo file rồi theo thực thể pset
         const groups = new Map();
-        pendingTargets.forEach(target => {
+        targets.forEach(target => {
             const groupKey = `${target.sourceId}|${target.entry.psetId}`;
             if (!groups.has(groupKey)) groups.set(groupKey, []);
             groups.get(groupKey).push(target);
         });
-        groups.forEach(group => applyToPsetGroup(group[0].modelID, group[0].sourceId, group, newValue, displayValue));
+        groups.forEach(group => applyToPsetGroup(rec, group[0].modelID, group[0].sourceId, group, newValue, displayValue));
 
-        const { regroup, recolor } = updateDerivedAttributes(pendingTargets, dialog.propName, dialog.original, displayValue);
+        const { regroup, recolor } = updateDerivedAttributes(targets, dialog.propName, dialog.original, displayValue);
         if (recolor) rebuildBatches();
         if (regroup) buildAllGroupingCollections();
 
-        editHistoryCount.value += pendingTargets.length;
-        hasUnsavedChanges.value = true;
+        const ifcChange = rec.finish();
+        const after = snapshotPsetState(affectedKeys, targets);
+        pushHistory({
+            label: t('Sửa "{0}" = "{1}" ({2} cấu kiện)', [dialog.propName, displayValue, targets.length]),
+            undo: () => { ifcChange.undo(); restorePsetState(before); },
+            redo: () => { ifcChange.redo(); restorePsetState(after); }
+        });
         const last = selectedMeshes.value[selectedMeshes.value.length - 1];
         if (last) showPropertiesForMesh(last);
-        showToast(t('Đã sửa giá trị'), t('Đã đổi "{0}" thành "{1}" cho {2} cấu kiện.', [dialog.propName, displayValue, pendingTargets.length]), 'success');
+        showToast(t('Đã sửa giá trị'), t('Đã đổi "{0}" thành "{1}" cho {2} cấu kiện.', [dialog.propName, displayValue, targets.length]), 'success');
         dialog.visible = false;
         pendingTargets = [];
     } catch (error) {
         console.error('Lỗi sửa giá trị Pset:', error);
+        // Phần đã ghi dở thì trả lại như cũ
+        try {
+            rec.finish().undo();
+            restorePsetState(before);
+        } catch (rollbackError) {
+            console.warn('Không khôi phục được sau lỗi sửa Pset:', rollbackError);
+        }
         showToast(t('Lỗi sửa giá trị'), error.message || String(error));
     }
 };

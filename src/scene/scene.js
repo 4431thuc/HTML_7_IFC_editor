@@ -7,8 +7,8 @@ import { initDimensionMarkers, updateDimensionScales } from '../dimension/dimens
 import { init6FaceCropBox, updateCropHandleScales } from './cropbox.js';
 import { rebuildBatches, syncBatchVisibility } from './rendering.js';
 import { createSampleRebarModel } from './sample-model.js';
-import { onPointerDown, onPointerLeave, onPointerMove, onPointerUp } from '../selection/input.js';
-import { IDLE_RENDER_INTERVAL_MS, axisGizmoAxes, backgroundThemeStorageKey, axisGizmoBackward, axisGizmoRight, axisGizmoUp, batchGroup, canvasContainer, clashAnnotationGroup, clashContextGroup, clashGroup, clashPairGroup, clashSelectionGroup, cropGroup, dimGroup, edgesGroup, isCropBoxActive, isLightBackground, isOrthographic, lightExposure, lightPreset, overlayGroup, rt, selectedMeshes, viewCubeEl, wasmReady } from '../state/state.js';
+import { onCanvasWheel, onPointerDown, onPointerLeave, onPointerMove, onPointerUp } from '../selection/input.js';
+import { CLASH_GHOST_LAYER, clashGhostDepthMaterial, clippingPlanes, IDLE_RENDER_INTERVAL_MS, axisGizmoAxes, backgroundThemeStorageKey, axisGizmoBackward, axisGizmoRight, axisGizmoUp, batchGroup, canvasContainer, clashAnnotationGroup, clashContextGroup, clashGroup, clashPairGroup, clashSelectionGroup, cropGroup, dimGroup, edgesGroup, isCropBoxActive, isLightBackground, isOrthographic, lightExposure, lightPreset, overlayGroup, rt, selectedMeshes, viewCubeEl, wasmReady } from '../state/state.js';
 import { VIEW_CUBE_BOX_PX, VIEW_CUBE_SIZE_PX } from '../state/constants.js';
 import { applyModelOpacityToScene, showToast } from '../ui/panels.js';
 import { t } from '../i18n/index.js';
@@ -186,6 +186,9 @@ export const initThreeJS = () => {
 
     rt.gridHelper = new THREE.GridHelper(30, 30, 0x94a3b8, 0xcfd8dc);
     rt.scene.add(rt.gridHelper);
+    rt.gridHelper.layers.enable(CLASH_GHOST_LAYER); // lưới vẽ cùng lớp mờ, không đè lên mô hình khi xem va chạm
+    // Đèn phải cùng layer với camera thì lượt vẽ lớp mờ của view va chạm (renderClashView) mới có ánh sáng
+    [rt.ambientLight, rt.hemiLight, rt.dirLight1, rt.dirLight2].forEach(light => light.layers.enable(CLASH_GHOST_LAYER));
     // Áp màu nền đã lưu trong trình duyệt (mặc định nền sáng)
     setBackgroundTheme(isLightBackground.value);
 
@@ -217,7 +220,8 @@ export const initThreeJS = () => {
     domElem.addEventListener('pointerup', onPointerUp);
     domElem.addEventListener('pointercancel', onPointerUp);
     domElem.addEventListener('pointermove', onPointerMove);
-    domElem.addEventListener('pointerleave', onPointerLeave);    rt.controls.addEventListener('change', requestRender);
+    domElem.addEventListener('pointerleave', onPointerLeave);
+    domElem.addEventListener('wheel', onCanvasWheel, { passive: true });    rt.controls.addEventListener('change', requestRender);
     rt.controls.addEventListener('change', compensateOrbitAroundPivot);
     window.addEventListener('resize', onWindowResize);
 
@@ -234,9 +238,39 @@ export const initThreeJS = () => {
         if (dimGroup.visible) updateDimensionScales();
         updateAxisGizmo();
         syncBatchVisibility();
-        rt.renderer.render(rt.scene, rt.camera);
+        if (clashContextGroup.visible) renderClashView();
+        else rt.renderer.render(rt.scene, rt.camera);
     };
     animate();
+};
+
+// View va chạm:
+//  1. Lớp mờ (mô hình nền + cấu kiện có va chạm, layer CLASH_GHOST_LAYER): ghi độ sâu trước, rồi tô màu với
+//     depthTest mặc định (LessEqual) -> mỗi điểm ảnh chỉ tô đúng bề mặt gần nhất một lần, không cộng dồn.
+//  2. Xóa độ sâu, vẽ phần còn lại (khối va chạm, đối tượng A/B, chấm, nhãn...) đè lên trên lớp mờ,
+//     nên khối va chạm nằm trong lồng thép vẫn luôn nhìn thấy.
+const renderClashView = () => {
+    const renderer = rt.renderer;
+    const camera = rt.camera;
+    const cameraMask = camera.layers.mask;
+    const autoClear = renderer.autoClear;
+    batchGroup.children.forEach(batch => batch.layers.set(CLASH_GHOST_LAYER));
+    camera.layers.set(CLASH_GHOST_LAYER);
+    clashGhostDepthMaterial.clippingPlanes = isCropBoxActive.value ? clippingPlanes : null;
+    rt.scene.overrideMaterial = clashGhostDepthMaterial;
+    renderer.render(rt.scene, camera);
+    rt.scene.overrideMaterial = null;
+    renderer.autoClear = false;
+    renderer.render(rt.scene, camera);
+    renderer.clearDepth();
+    camera.layers.mask = cameraMask;
+    // Lưới đã vẽ ở lượt lớp mờ (bị mô hình che đúng chỗ), không vẽ lại đè lên trên
+    const gridVisible = rt.gridHelper?.visible;
+    if (rt.gridHelper) rt.gridHelper.visible = false;
+    renderer.render(rt.scene, camera);
+    if (rt.gridHelper) rt.gridHelper.visible = gridVisible;
+    renderer.autoClear = autoClear;
+    batchGroup.children.forEach(batch => batch.layers.set(0));
 };
 
 // THIẾT LẬP MÀU NỀN VIEW 3D: SÁNG (LIGHT) HOẶC TỐI (DARK)
@@ -255,6 +289,7 @@ export const setBackgroundTheme = (light) => {
             rt.scene.remove(rt.gridHelper);
             rt.gridHelper = new THREE.GridHelper(30, 30, 0x94a3b8, 0xcfd8dc);
             rt.scene.add(rt.gridHelper);
+            rt.gridHelper.layers.enable(CLASH_GHOST_LAYER); // lưới vẽ cùng lớp mờ, không đè lên mô hình khi xem va chạm
         }
     } else {
         rt.scene.background = new THREE.Color(0x0f172a); // Nền tối slate 900
@@ -262,6 +297,7 @@ export const setBackgroundTheme = (light) => {
             rt.scene.remove(rt.gridHelper);
             rt.gridHelper = new THREE.GridHelper(30, 30, 0x334155, 0x1e293b);
             rt.scene.add(rt.gridHelper);
+            rt.gridHelper.layers.enable(CLASH_GHOST_LAYER); // lưới vẽ cùng lớp mờ, không đè lên mô hình khi xem va chạm
         }
     }
 };

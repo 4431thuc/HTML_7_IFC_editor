@@ -3,7 +3,7 @@
 Danh sách việc cần làm rút ra từ buổi rà soát code. Đánh dấu `[x]` khi xong và ghi vào `version.md`.
 
 ## Lộ trình đề xuất
-1. Undo/Redo + Bar schedule (dùng được ngay)
+1. Undo/Redo (xong 25.11.2026) + Bar schedule (tạm ẩn, cần chỉnh lại độ chính xác)
 2. Web Worker cho web-ifc + dùng chung hình học trùng (hiệu năng file lớn)
 3. Tách Vue SFC + Tailwind build (dễ bảo trì, chạy offline)
 4. Diff phiên bản, kiểm tra lớp bảo vệ/IDS, BCF (công cụ QA/QC)
@@ -13,8 +13,8 @@ Danh sách việc cần làm rút ra từ buổi rà soát code. Đánh dấu `[
 ## 1. Chức năng quản lý, chỉnh sửa IFC
 
 ### Ưu tiên cao (đặc thù BIM bê tông cốt thép)
-- [ ] **Undo/Redo**: nâng `editHistoryCount` thành stack lệnh (command pattern), mỗi thao tác Pset/attribute/transport/remove lưu `{do, undo}`. Với web-ifc: lưu bản `GetLine` cũ trước khi `WriteLine`. Phím `Ctrl+Z` / `Ctrl+Y`.
-- [ ] **Bảng thống kê thép (Bar schedule)**: gom theo Pos, Ø, số lượng, chiều dài, khối lượng (kg); xuất CSV/Excel. Dữ liệu có sẵn trong `psetCache`.
+- [x] **Undo/Redo** (`src/core/history.js`): nâng `editHistoryCount` thành stack lệnh (command pattern), mỗi thao tác Pset/attribute/transport/remove lưu `{do, undo}`. Với web-ifc: lưu bản `GetLine` cũ trước khi `WriteLine`. Phím `Ctrl+Z` / `Ctrl+Y`.
+- [ ] **Bảng thống kê thép (Bar schedule)** (đã có code nhưng tạm ẩn tab vì kết quả chưa chính xác, bật lại bằng `SHOW_BAR_SCHEDULE_TAB`): gom theo Pos, Ø, số lượng, chiều dài, khối lượng (kg); xuất CSV/Excel (`src/ifc/bar-schedule.js`, tab Thống kê). Hiện ở panel trái; chuyển sang bảng dock ở đáy khi làm mục giao diện.
 - [ ] **Kiểm tra lỗi thép** (mở rộng `checkIfFaultyRebar`):
   - [ ] Cùng Pos nhưng khác Ø / hình dạng / chiều dài
   - [ ] Thanh trùng (2 thanh chồng khít nhau)
@@ -47,7 +47,7 @@ Danh sách việc cần làm rút ra từ buổi rà soát code. Đánh dấu `[
 - [ ] **Panel trái**: tách "Dữ liệu" (Files, Nhóm, Cây không gian) khỏi "Công cụ" (Transport, Clash, Chia tách).
 - [ ] **Panel thuộc tính**: ô tìm thuộc tính, ghim thuộc tính hay dùng, copy giá trị; chọn nhiều cấu kiện thì hiện "giá trị chung / *nhiều giá trị*".
 - [ ] **Bảng dữ liệu dock ở đáy** (thu gọn được) cho bar schedule, kết quả clash, kết quả kiểm tra; click dòng thì zoom tới cấu kiện.
-- [ ] **Phím tắt mới**: `H` ẩn, `I` cô lập, `Shift+H` hiện tất cả, `F` zoom tới vùng chọn, `Ctrl+Z/Y`, `?` mở bảng phím tắt.
+- [ ] **Phím tắt mới**: `H` ẩn, `I` cô lập, `Shift+H` hiện tất cả, `F` zoom tới vùng chọn, ~~`Ctrl+Z/Y`~~ (đã có), `?` mở bảng phím tắt.
 - [ ] **Tiến trình**: thanh % và nút Hủy khi nạp file lớn hoặc chạy clash.
 
 ---
@@ -58,6 +58,7 @@ Danh sách việc cần làm rút ra từ buổi rà soát code. Đánh dấu `[
 - [ ] **web-ifc chạy trong Web Worker**: `OpenModel`, `StreamAllMeshes`, `SaveModel` hiện chạy trên luồng chính nên UI bị đứng. Truyền `Float32Array/Uint32Array` qua transferable.
 - [ ] **Bỏ hình học nhân đôi**: mỗi cấu kiện vừa là `THREE.Mesh` vừa được copy vào `BatchedMesh`, nên RAM gần gấp đôi. Chỉ giữ dữ liệu tối thiểu (bounds, BVH) ngoài batch.
 - [ ] **Dùng chung hình học trùng**: thép cùng Pos cùng hình dạng, gom theo `geometryExpressID`, dùng `InstancedMesh` hoặc `BatchedMesh` nhiều instance (three r166+).
+- [x] **View clash lag** (xong 25.11.2026, picking khi rê chuột vẫn dò từng cấu kiện): đường bao xám (`clashContextGroup`) là 1 `LineSegments` cho MỖI cấu kiện (hàng nghìn draw call, vật liệu trong suốt, `frustumCulled = false`, cạnh thép 12 cạnh với ngưỡng 18° giữ gần hết cạnh); mỗi khối clash thêm 2 draw call. Gộp thành 1 `LineSegments` + 1 `BatchedMesh` như vùng chọn.
 - [ ] **`rebuildBatches()` dựng lại toàn bộ**: đổi sang dựng lại theo source; transport chỉ cần `setMatrixAt`.
 - [ ] **Lưu IFC** (`src/ifc/export.js`): đang `SaveModel`, rồi `OpenModel` bản tạm, rồi `SaveModel` lần nữa, tốn gấp 2–3 lần thời gian và RAM. Xem cách ghi thẳng vào model gốc, hoặc làm trong worker.
 - [ ] **IndexedDB**: cache file đã mở (F5 không phải chọn lại), lưu phiên (đo, viewpoint, bộ lọc).

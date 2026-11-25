@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { computeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 import { createApp, nextTick, onBeforeUnmount, onMounted, watch } from 'vue';
-import { clearClashResults, onClashButtonClick, runClashCheck, toggleClashPairObjects, zoomToClash } from './clash/clash.js';
+import { answerClashCancelPrompt, clearClashResults, onClashButtonClick, describeClashElement, formatClashVolume, requestClearClashResults, runClashCheck, toggleClashHideOtherRebar, toggleClashPairObjects, toggleClashView, zoomToClash } from './clash/clash.js';
 import { formatDimCoords, formatDimDistance, removeDimension, toggleDimensionMode, zoomToDimension } from './dimension/dimension.js';
 import { visibleExportItems } from './core/helpers.js';
+import { canRedo, canUndo, redo, redoLabel, undo, undoLabel } from './core/history.js';
 import { lang, t, toggleLanguage } from './i18n/index.js';
 import { exportCombineIFC, exportModifiedIFC, exportVisibleIFC } from './ifc/export.js';
 import { clashTypeOptions, filteredGroups, queueSelectedForRemoval, restoreRemovedItem, setAllActiveGroupsVisibility, toggleSelectedVisibility, toggleSingleGroupVisibility } from './ifc/groups.js';
@@ -17,7 +18,8 @@ import { handleKeyDown, handleKeyUp, onPointerLeave } from './selection/input.js
 import { clearSelection, isMeshManuallyHidden, isMeshPendingRemoval, isMeshSelected, onGroupMouseEnter, onGroupMouseLeave, onItemClick, onItemDblClick, onItemMouseEnter, onItemMouseLeave, selectGroupMeshes, zoomToGroup } from './selection/selection.js';
 import { duplicateFilePrompt, currentProjectInfo, projectInfoDirty, projectInfoSourceId, allGroups, axisGizmoXLabel, axisGizmoXLine, axisGizmoXPoint, axisGizmoYLabel, axisGizmoYLine, axisGizmoYPoint, axisGizmoZLabel, axisGizmoZLine, axisGizmoZPoint, canvasContainer, clashBusy, clashCount, clashError, clashItems, clashModeActive, clashProgress, clashToleranceMm, clashTypeA, clashTypeB, clashVolume, contextMenu, deletedItems, dimItems, dimModeActive, deletedObjectCount, dontShowIntroAgain, editHistoryCount, editableAttributes, faultyCount, fileName, filterFaultyBars, groupCriterion, groupListContainer, groupSearchQuery, hasAttributeChanges, hasLoadedIfc, hasUnsavedChanges, hiddenObjectCount, hoveredType, introPanelContent, introPanelStorageKey, isBoxSelecting, isCropBoxActive, isEditingAttributes, isFlatShading, isIfcDragOver, isLightBackground, isLoading, isOrthographic, isRebarOnly, isSampleModel, isWireframe, isXRayMode, leftActiveTab, leftPanelWidth, lightExposure, lightPreset, loadingText, modelOpacityPercent, openFileCount, rightPanelWidth, rt, selectedClashId, selectedDimId, selectedMeshes, statusIndicator, selectedObject, selectionOutlineMaterial, selectionOutlines, showClashPairObjects, showEdges, showGrid, showIntroPanel, showLeftPanel, showOutsideCropEdges, showRightPanel, showTransportProfileModal, sourceFiles, stats, toastMessage, toastTitle, toastType, transportHistory, transportInnerTab, transportInputs, transportProfileName, transportProfileNameInput, transportProfiles, wasmReady, xrayOpacity } from './state/state.js';
 import { hoverViewDir, viewCubeEl } from './state/state.js';
-import { VIEW_CUBE_FACES } from './state/constants.js';
+import { SHOW_BAR_SCHEDULE_TAB, VIEW_CUBE_FACES } from './state/constants.js';
+import { clashCancelPrompt, clashHideOtherRebar, clashResultsReady } from './state/state.js';
 import { closeContextMenu, contextMenuAction, handleContextMenuEscape, handleContextMenuOutsidePointer, openContextMenu } from './ui/context-menu.js';
 import { adjustPanelWidth, boxSelectionStyle, closeIntroPanel, endPanelResize, persistModelOpacity, playUiPop, startPanelResize, togglePropertiesPanel, updateModelOpacity, updatePanelResize } from './ui/panels.js';
 import { resetEditableAttributes, saveAttributeChanges } from './ui/properties.js';
@@ -25,6 +27,8 @@ import { applyProjectInfoChanges, resetProjectInfo } from './ifc/project-info.js
 import { NumberField } from './ui/number-field.js';
 import { initButtonStyle } from './ui/button-style.js';
 import { applyPsetEdit } from './ifc/pset-edit.js';
+import { computeBarSchedule, exportBarScheduleCsv, exportBarScheduleExcel, formatScheduleLength, scheduleBarScheduleRefresh, selectBarScheduleRow } from './ifc/bar-schedule.js';
+import { barScheduleDiameters, barScheduleRows, barScheduleSplitByFile, barScheduleStale, barScheduleTotals, barScheduleVisibleOnly, exportListVersion } from './state/state.js';
 import { psetEditDialog } from './state/state.js';
 import { getSelectedCoords, getSourceCoords } from './ui/coords-info.js';
 import { coordVersion } from './state/state.js';
@@ -37,6 +41,11 @@ createApp({
     setup() {
         // Đổi ngôn ngữ: vẽ lại phần chữ nằm trong canvas 3D (bảng thông tin model mẫu)
         watch(lang, redrawSampleInfoLabel);
+        // Bảng thống kê thép: đánh dấu cũ khi ẩn/hiện/xóa/đổi tùy chọn, tự lập lại khi tab đang mở
+        watch([exportListVersion, barScheduleVisibleOnly, barScheduleSplitByFile, lang], () => { barScheduleStale.value = true; });
+        watch([leftActiveTab, barScheduleStale], ([tab, stale]) => {
+            if (tab === 'schedule' && stale) scheduleBarScheduleRefresh();
+        });
 
         // --- LIFECYCLE HOOKS ---
         onMounted(async () => {
@@ -154,6 +163,16 @@ createApp({
             getSourceCoords,
             formatDimDistance,
             clashModeActive,
+            clashResultsReady,
+            clashHideOtherRebar,
+            describeClashElement,
+            formatClashVolume,
+            toggleClashHideOtherRebar,
+            clashCancelPrompt,
+            toggleClashView,
+            requestClearClashResults,
+            answerClashCancelPrompt,
+            showBarScheduleTab: SHOW_BAR_SCHEDULE_TAB,
             clashBusy,
             clashCount,
             clashVolume,
@@ -190,6 +209,23 @@ createApp({
             faultyCount,
             editHistoryCount,
             hasUnsavedChanges,
+            canUndo,
+            canRedo,
+            barScheduleRows,
+            barScheduleDiameters,
+            barScheduleTotals,
+            barScheduleVisibleOnly,
+            barScheduleSplitByFile,
+            barScheduleStale,
+            computeBarSchedule,
+            exportBarScheduleCsv,
+            exportBarScheduleExcel,
+            formatScheduleLength,
+            selectBarScheduleRow,
+            undoLabel,
+            redoLabel,
+            undo,
+            redo,
             stats,
             selectedMeshes,
             selectedObject,

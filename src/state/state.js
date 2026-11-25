@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, shallowRef } from 'vue';
 import * as THREE from 'three';
 import { INTRO_PANEL_CONTENT } from './constants.js';
 
@@ -82,7 +82,10 @@ export const projectInfoDirty = computed(() => {
 export const showLeftPanel = ref(true);
 export const showRightPanel = ref(false);
 export const leftActiveTab = ref('groups');
+// clashModeActive: đang XEM view va chạm; clashResultsReady: đã có kết quả (vẫn giữ khi tắt view)
 export const clashModeActive = ref(false);
+export const clashResultsReady = ref(false);
+export const clashCancelPrompt = ref(false);
 export const clashBusy = ref(false);
 export const clashProgress = ref(0);
 export const clashCount = ref(0);
@@ -167,6 +170,14 @@ export const attributeBaseline = reactive({
 });
 
 export const stats = reactive({ meshes: 0, rebarCount: 0 });
+
+// Bảng thống kê thép (tab Thống kê, src/ifc/bar-schedule.js). Hàng chứa mảng mesh nên dùng shallowRef (không bọc proxy).
+export const barScheduleRows = shallowRef([]);
+export const barScheduleDiameters = shallowRef([]);
+export const barScheduleTotals = shallowRef(null);
+export const barScheduleVisibleOnly = ref(false);
+export const barScheduleSplitByFile = ref(false);
+export const barScheduleStale = ref(true);
 
 export const selectedMeshes = ref([]);
 export const selectedObject = ref(null);
@@ -259,17 +270,36 @@ export const clashAnnotationGroup = new THREE.Group();
 clashAnnotationGroup.name = 'SelectedClashAnnotation';
 export const clashPairGroup = new THREE.Group();
 clashPairGroup.name = 'SelectedClashPairObjects';
-export const clashPairMaterialA = new THREE.MeshBasicMaterial({
-    color: 0x38bdf8, transparent: true, opacity: 0.35, side: THREE.DoubleSide,
-    depthWrite: false, toneMapped: false
+// Màu view va chạm: khối giao ĐỎ, cặp đang chọn VÀNG, đối tượng A XANH DƯƠNG, đối tượng B TÍM, mô hình nền xám mờ
+export const clashPairMaterialA = new THREE.MeshLambertMaterial({
+    color: 0x3b82f6, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false
 });
-export const clashPairMaterialB = new THREE.MeshBasicMaterial({
-    color: 0xfb923c, transparent: true, opacity: 0.35, side: THREE.DoubleSide,
-    depthWrite: false, toneMapped: false
+export const clashPairMaterialB = new THREE.MeshLambertMaterial({
+    color: 0xa855f7, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false
 });
-export const showClashPairObjects = ref(false);
+// Chọn một cặp là hiện luôn 2 đối tượng A/B (vẫn tắt được bằng nút)
+export const showClashPairObjects = ref(true);
+// Ẩn thép không dính va chạm cho đỡ rối (thép có va chạm vẫn hiện)
+export const clashHideOtherRebar = ref(false);
+// Mô hình nền trong view va chạm: khối mờ có ánh sáng (dùng lại BatchedMesh của view thường, ít lệnh vẽ).
+// Vẽ theo kiểu MỘT LỚP (scene.js: renderClashView): ghi độ sâu trước rồi chỉ tô bề mặt gần nhất, nên lồng thép
+// hàng trăm lớp vẫn chỉ mờ đúng bằng opacity dưới đây, không cộng dồn thành mảng đặc.
+export const CLASH_GHOST_LAYER = 2;
+export const clashGhostConcreteMaterial = new THREE.MeshLambertMaterial({
+    color: 0xa3aec0, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false
+});
+export const clashGhostRebarMaterial = new THREE.MeshLambertMaterial({
+    color: 0x8792a3, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false
+});
+// Cấu kiện có tham gia va chạm: đậm hơn nền (cũng một lớp)
+export const clashInvolvedMaterial = new THREE.MeshLambertMaterial({
+    color: 0x64748b, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false
+});
+// Lượt ghi độ sâu (không tô màu) trước khi tô lớp mờ
+export const clashGhostDepthMaterial = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
+// Đường bao rất nhạt của bê tông (không vẽ cho thép để đỡ rối)
 export const clashContextMaterial = new THREE.LineBasicMaterial({
-    color: 0x94a3b8, transparent: true, opacity: 0.38,
+    color: 0x94a3b8, transparent: true, opacity: 0.22,
     depthTest: true, depthWrite: false, toneMapped: false
 });
 export const clashOutlineMaterial = new THREE.LineBasicMaterial({
@@ -349,19 +379,23 @@ export const modelOpacityBases = new WeakMap();
 export const transportProfileStorageKey = 'ifc-editor-transport-profiles';
 export const transportInputFields = ['centerX', 'centerY', 'centerZ', 'angleDegrees', 'vectorX', 'vectorY', 'vectorZ'];
 
-// --- KIỂM TRA CLASH: khối giao đặc, phần còn lại chỉ hiển thị đường bao ---
-export const clashBlueMaterial = new THREE.MeshBasicMaterial({
-    color: 0x168bff, side: THREE.DoubleSide, transparent: false,
+// --- KIỂM TRA CLASH: khối giao đặc màu đỏ (có ánh sáng để thấy hình khối) ---
+export const clashVolumeMaterial = new THREE.MeshLambertMaterial({
+    color: 0xef4444, emissive: 0x450a0a, side: THREE.DoubleSide, transparent: false,
     opacity: 1, depthWrite: true, depthTest: true,
-    polygonOffset: true, polygonOffsetFactor: -1, toneMapped: false
+    polygonOffset: true, polygonOffsetFactor: -1
 });
-export const clashYellowMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffd21f, side: THREE.DoubleSide, transparent: false,
-    opacity: 1, depthWrite: true, depthTest: true, toneMapped: false
+// Khối clash đang chọn là một mesh riêng vẽ đè lên khối đỏ đã gộp: offset mạnh hơn để luôn nằm trên
+export const clashYellowMaterial = new THREE.MeshLambertMaterial({
+    color: 0xfacc15, emissive: 0x3f2d00, side: THREE.DoubleSide, transparent: false,
+    opacity: 1, depthWrite: true, depthTest: true,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4
 });
-export const clashRedMaterial = new THREE.MeshBasicMaterial({
-    color: 0xef4444, side: THREE.DoubleSide, transparent: false,
-    opacity: 1, depthWrite: true, depthTest: true, toneMapped: false
+// Màu nhấp nháy xen kẽ với vàng khi vừa chọn
+export const clashFlashMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff, side: THREE.DoubleSide, transparent: false,
+    opacity: 1, depthWrite: true, depthTest: true,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, toneMapped: false
 });
 // Biến runtime có thể gán lại (trước đây là `let` trong setup)
 export const rt = {

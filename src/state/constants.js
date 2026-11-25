@@ -1,3 +1,6 @@
+// Tab Thống kê thép (bar schedule) tạm ẩn vì kết quả chưa chính xác; đổi thành true để bật lại
+export const SHOW_BAR_SCHEDULE_TAB = false;
+
 // Bảng màu phân biệt cấu kiện kiến trúc & kết cấu
 export const ENTITY_DEFAULT_COLORS = {
     'IFCCOLUMN': '#0284c7',               // Xanh lam cột kết cấu

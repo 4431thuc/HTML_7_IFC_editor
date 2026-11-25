@@ -1,4 +1,5 @@
-import { editHistoryCount, hasUnsavedChanges, projectHeaderOverrides, projectInfoSourceId, projectInfos, rt, showRightPanel, selectedMeshes, sourceFiles } from '../state/state.js';
+import { createIfcRecorder, pushHistory } from '../core/history.js';
+import { projectHeaderOverrides, projectInfoSourceId, projectInfos, rt, showRightPanel, selectedMeshes, sourceFiles } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
 import { t } from '../i18n/index.js';
 
@@ -250,6 +251,20 @@ const toIfcAttribute = (field, original) => {
     return original ? { ...original, value: text } : { type: 1, value: text };
 };
 
+// Hoàn tác: chụp giá trị đã ghi của mọi field + header ghi đè của một file
+const snapshotProjectInfo = (sourceId) => ({
+    fields: (projectInfos[sourceId]?.sections || []).flatMap(section => section.fields.map(field => [field, field.original])),
+    header: projectHeaderOverrides[sourceId] ? { ...projectHeaderOverrides[sourceId] } : null
+});
+const restoreProjectInfo = (sourceId, snapshot) => {
+    snapshot.fields.forEach(([field, value]) => {
+        field.value = value;
+        field.original = value;
+    });
+    if (snapshot.header) projectHeaderOverrides[sourceId] = { ...snapshot.header };
+    else delete projectHeaderOverrides[sourceId];
+};
+
 export const applyProjectInfoChanges = () => {
     const info = projectInfos[projectInfoSourceId.value];
     const source = sourceFiles.value.find(item => item.id === projectInfoSourceId.value);
@@ -269,6 +284,8 @@ export const applyProjectInfoChanges = () => {
 
     let written = 0;
     let sanitizedCount = 0;
+    const rec = createIfcRecorder();
+    const before = snapshotProjectInfo(source.id);
     entityChanges.forEach((fields, expressID) => {
         const line = safeGetLine(source.modelID, expressID);
         if (!line) return;
@@ -287,7 +304,7 @@ export const applyProjectInfoChanges = () => {
         });
         if (applied.length === 0) return;
         try {
-            rt.ifcAPI.WriteLine(source.modelID, line);
+            rec.write(source.modelID, line);
             applied.forEach(field => { field.original = field.value; });
             written += applied.length;
         } catch (error) {
@@ -307,8 +324,13 @@ export const applyProjectInfoChanges = () => {
     }
 
     if (written > 0) {
-        editHistoryCount.value++;
-        hasUnsavedChanges.value = true;
+        const ifcChange = rec.finish();
+        const after = snapshotProjectInfo(source.id);
+        pushHistory({
+            label: t('Sửa thông tin dự án "{0}"', [source.name]),
+            undo: () => { ifcChange.undo(); restoreProjectInfo(source.id, before); },
+            redo: () => { ifcChange.redo(); restoreProjectInfo(source.id, after); }
+        });
         showToast(t('Đã lưu thông tin dự án'), t('Đã cập nhật {0} thông tin. Bấm "Lưu file IFC" để tạo file mới.', [written]), 'success');
     }
     if (sanitizedCount > 0) showToast(t("Đã thay ký tự đặc biệt"), t("Dấu nháy đơn và gạch chéo ngược được thay bằng ’ và / để tránh làm hỏng file IFC."));

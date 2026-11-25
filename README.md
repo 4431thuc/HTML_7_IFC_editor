@@ -16,6 +16,8 @@
 | Chỉnh sửa | Sửa Name, ObjectType, Tag, Description; **sửa giá trị thuộc tính Pset** (chuột phải > Sửa giá trị) cho các cấu kiện đang chọn; lưu thành IFC mới | Chuẩn hóa dữ liệu trước khi bàn giao |
 | **Thông tin dự án** | Mở file là panel phải hiện header file, IfcProject, IfcSite, IfcBuilding, IfcBuildingStorey, người / tổ chức / ứng dụng xuất IFC, địa chỉ; sửa được và lưu vào IFC mới | Chuẩn hóa tên dự án, tòa, khu, tác giả trước khi bàn giao |
 | Remove / Restore | Đánh dấu xóa cấu kiện (phím Delete ở mọi tab), khôi phục, xuất IFC đã loại bỏ | Dọn mô hình mà không mất bản gốc |
+| **Hoàn tác / Làm lại** | Ctrl+Z / Ctrl+Y (hoặc nút ↶ ↷ trên header) cho sửa attribute, sửa Pset, transport, thông tin dự án, đánh dấu xóa / khôi phục | Sửa nhầm không phải mở lại file |
+| **Thống kê thép** (tạm ẩn) | Tab Thống kê: gom thép theo Pos + Ø, số lượng, chiều dài 1 thanh, tổng chiều dài, khối lượng (kg), tổng theo đường kính; xuất CSV / Excel; click hàng để chọn và zoom | Bảng thống kê thép (bar schedule) ngay từ IFC |
 | Phân nhóm | Theo Pos thép, Name, ObjectType, IFC Type; lọc, ẩn/hiện, chọn cả nhóm | Quản lý hàng nghìn cấu kiện dễ dàng |
 | Thép | Tô màu theo đường kính Ø, nhận diện thanh lỗi, lọc chỉ-thép | Đọc bản vẽ thép trực quan |
 | Tọa độ | Panel thuộc tính và panel thông tin dự án hiện tọa độ tâm/min/max theo hệ dự án (X, Y, Z-up, mét) | Kiểm tra vị trí cấu kiện, mô hình sau khi dịch chuyển |
@@ -34,6 +36,7 @@ flowchart LR
     C -->|Đo khoảng cách| M[Đo đạc: phím D]
     C -->|Chỉnh dữ liệu| F[Sửa Attributes]
     C -->|Dọn mô hình| G[Remove / Restore]
+    C -->|Thống kê thép| S[Bar schedule: CSV / Excel]
     C -->|Ghép nhiều file| H[Combine + Transport]
     D --> I[Lưu / Xuất IFC]
     E --> I
@@ -88,6 +91,20 @@ Chọn một hoặc nhiều cấu kiện, chuột phải vào một thuộc tín
 - Giá trị mới cập nhật ở panel thuộc tính, chọn/hiện tương tự, lọc, nhóm Pos và màu thép (nếu thuộc tính là Pos/đường kính), và tăng bộ đếm của nút **Lưu file IFC**.
 - Chỉ sửa được thuộc tính đơn giá trị (IfcPropertySingleValue) đang có giá trị.
 
+## Hoàn tác / Làm lại
+
+Mỗi thao tác ghi vào IFC là một lệnh trong stack: sửa attribute, sửa giá trị Pset (kể cả khi phải tách bản sao pset), một lượt transport, áp dụng thông tin dự án, đánh dấu xóa / khôi phục cấu kiện. **Ctrl+Z** hoàn tác, **Ctrl+Y** hoặc **Ctrl+Shift+Z** làm lại; nút ↶ ↷ cạnh nút Lưu file IFC hiện tên thao tác khi rê chuột. Số trên nút Lưu là số thao tác khác với lần lưu gần nhất, hoàn tác về đúng bản đã lưu thì nút tắt. Ẩn/hiện, chọn, CropBox, đo đạc không nằm trong stack. Mở file thay thế hoặc đóng một file thì lịch sử được xóa (giữ tối đa 200 thao tác).
+
+## Thống kê thép (Bar schedule)
+
+> Tab này đang tạm ẩn vì kết quả chưa chính xác.
+
+Tab **Thống kê** gom các thanh thép (không tính thanh trong danh sách xóa) theo **Pos + Ø**, tùy chọn chỉ tính thép đang hiện và tách theo file. Mỗi hàng: số lượng, chiều dài 1 thanh (cùng Pos mà dài khác nhau thì hiện khoảng min–max màu vàng), tổng chiều dài, khối lượng; cuối bảng là tổng theo đường kính và tổng chung.
+
+- Chiều dài lấy từ thuộc tính `BarLength` của `IfcReinforcingBar` (đổi theo đơn vị của file); thiếu thì tính từ hình học (dấu ≈): thanh thép là ống kín nên từ thể tích và diện tích bề mặt suy ra được chiều dài đường tim, đúng cả với thanh uốn.
+- Khối lượng = L (m) × Ø² (mm) × 0,00617 kg/m (thép 7850 kg/m³), Ø là đường kính danh định nhận lúc nạp file.
+- Xuất **CSV** (UTF-8, dấu phẩy) hoặc **Excel** (.xls dạng XML, 2 sheet: chi tiết và theo đường kính; Excel có thể hỏi xác nhận định dạng khi mở).
+
 ## Transport (dịch chuyển)
 
 - Áp cho **các file IFC đang mở lúc bấm**; file mở thêm sau đó giữ nguyên vị trí, nên có thể đưa mô hình thép về tọa độ công trường rồi mở model công trường để đối chiếu.
@@ -125,12 +142,13 @@ flowchart TB
         UI[Vue 3 - index.html và main.js]
         State[state.js - ref/reactive và rt]
         subgraph Logic[Module chức năng]
-            IFC[ifc: loader, groups, transport, export, project-info, pset-edit]
+            IFC[ifc: loader, groups, transport, export, project-info, pset-edit, bar-schedule]
             Scene[scene: Three.js, cropbox, display, rendering]
             Sel[selection: chọn, input]
             Clash[clash: kiểm tra va chạm]
             Dim[dimension: đo đạc, bắt điểm]
             Coords[core/coords: hệ trục dự án]
+            History[core/history: hoàn tác / làm lại]
         end
         WASM[web-ifc WASM]
     end
@@ -143,6 +161,7 @@ flowchart TB
     Dim --> Scene
     Dim --> Coords
     IFC --> Coords
+    IFC --> History
 ```
 
 ## Thao tác nhanh
@@ -160,6 +179,7 @@ flowchart TB
 | C | Bật / tắt CropBox |
 | D | Bật / tắt chế độ đo đạc |
 | X | Bật / tắt X-Ray |
+| Ctrl + Z / Ctrl + Y | Hoàn tác / làm lại thao tác ghi IFC (Ctrl + Shift + Z cũng là làm lại) |
 | Chuột phải vào thuộc tính | Menu Sửa giá trị (thuộc tính Pset), Chọn / Chỉ hiện tương tự, lọc theo giá trị |
 
 Thanh trạng thái phía dưới còn có thanh **độ mờ mô hình**, nút ☀️/🌚 đổi nền sáng/tối và nút **Persp/Ortho**.

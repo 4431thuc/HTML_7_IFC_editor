@@ -7,11 +7,12 @@ import { syncDimensionsToModelFrame } from '../dimension/dimension.js';
 import { resetCropBoxToModel } from '../scene/cropbox.js';
 import { ensureIntersectionEdges, invalidateIntersectionEdges } from '../scene/intersections.js';
 import { requestRender } from '../core/helpers.js';
+import { pushHistory, removeHistoryCommand } from '../core/history.js';
 import { centerModelByBoundingBox } from './loader.js';
 import { rebuildBatches } from '../scene/rendering.js';
 import { fitCameraToModel } from '../scene/scene.js';
 import { updateSelectionOutlines } from '../selection/selection.js';
-import { clashModeActive, coordVersion, deletedItems, dimModeActive, showEdges, editHistoryCount, edgesGroup, hasUnsavedChanges, isCropBoxActive, rt, showTransportProfileModal, sourceFiles, transportHistory, transportInputFields, transportInputs, transportProfileName, transportProfileNameInput, transportProfileStorageKey, transportProfiles, transportRotationAxis } from '../state/state.js';
+import { clashResultsReady, coordVersion, dimModeActive, showEdges, edgesGroup, isCropBoxActive, rt, showTransportProfileModal, sourceFiles, transportHistory, transportInputFields, transportInputs, transportProfileName, transportProfileNameInput, transportProfileStorageKey, transportProfiles, transportRotationAxis } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
 import { t } from '../i18n/index.js';
 
@@ -357,14 +358,14 @@ const moveSources = (sourceIds, operationMatrix) => {
     rebuildBatches();
     // Đường giao chỉ tính lại khi đang cần (hiện viền hoặc đang đo đạc)
     if (showEdges.value || dimModeActive.value) ensureIntersectionEdges();
-    if (clashModeActive.value) clearClashResults();
+    if (clashResultsReady.value) clearClashResults();
     fitCameraToModel();
     if (isCropBoxActive.value) resetCropBoxToModel();
     requestRender();
 };
 
 export const applyTransport = () => {
-    if (clashModeActive.value) clearClashResults();
+    if (clashResultsReady.value) clearClashResults();
     if (sourceFiles.value.length === 0) {
         showToast(t('Chưa có file IFC'), t('Mở ít nhất một file IFC trước khi dịch chuyển.'));
         return;
@@ -410,9 +411,18 @@ export const applyTransport = () => {
         historyOperations.set(entry.id, { matrix: operationMatrix, sourceIds });
         moveSources(sourceIds, operationMatrix);
         transportHistory.value = [entry, ...transportHistory.value];
-        // Dịch chuyển làm thay đổi file xuất: bật nút lưu IFC và tính vào số thay đổi
-        editHistoryCount.value++;
-        hasUnsavedChanges.value = true;
+        // Dịch chuyển làm thay đổi file xuất: bật nút lưu IFC và tính vào số thay đổi (Ctrl+Z hoàn tác được)
+        pushHistory({
+            label: t('Dịch chuyển {0} file', [sourceIds.length]),
+            transportId: entry.id,
+            undo: () => revertTransportEntry(entry),
+            redo: () => {
+                const openIds = new Set(sourceFiles.value.map(source => source.id));
+                historyOperations.set(entry.id, { matrix: operationMatrix, sourceIds });
+                moveSources(sourceIds.filter(id => openIds.has(id)), operationMatrix);
+                transportHistory.value = [entry, ...transportHistory.value];
+            }
+        });
         showToast(t('Dịch chuyển thành công'), t('Đã áp dụng xoay và dịch chuyển cho các file IFC đang mở ({0} file). File mở thêm sau này không bị ảnh hưởng.', [sourceIds.length]), 'success');
     } catch (error) {
         console.error('Lỗi transport IFC:', error);
@@ -420,18 +430,24 @@ export const applyTransport = () => {
     }
 };
 
-export const undoTransport = (entry) => {
-    const latest = transportHistory.value[0];
+// Trả các file về vị trí trước lượt dịch chuyển entry (không đụng tới stack hoàn tác)
+const revertTransportEntry = (entry) => {
     const operation = historyOperations.get(entry.id);
-    if (!latest || latest.id !== entry.id || !operation) {
-        showToast(t('Không thể hoàn tác'), t('Chỉ có thể hoàn tác lượt dịch chuyển mới nhất.'));
-        return;
-    }
+    if (!operation) return;
     historyOperations.delete(entry.id);
     transportHistory.value = transportHistory.value.filter(item => item.id !== entry.id);
     const openIds = new Set(sourceFiles.value.map(source => source.id));
     moveSources(operation.sourceIds.filter(id => openIds.has(id)), operation.matrix.clone().invert());
-    editHistoryCount.value = Math.max(0, editHistoryCount.value - 1);
-    if (editHistoryCount.value === 0 && deletedItems.value.length === 0) hasUnsavedChanges.value = false;
+};
+
+// Nút hoàn tác trong danh sách lịch sử transport: chỉ lượt mới nhất
+export const undoTransport = (entry) => {
+    const latest = transportHistory.value[0];
+    if (!latest || latest.id !== entry.id || !historyOperations.has(entry.id)) {
+        showToast(t('Không thể hoàn tác'), t('Chỉ có thể hoàn tác lượt dịch chuyển mới nhất.'));
+        return;
+    }
+    revertTransportEntry(entry);
+    removeHistoryCommand(command => command.transportId === entry.id);
     showToast(t('Đã hoàn tác dịch chuyển'), t('Đã khôi phục tọa độ trước lượt dịch chuyển gần nhất.'), 'success');
 };

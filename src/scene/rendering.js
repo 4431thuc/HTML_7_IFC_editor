@@ -2,13 +2,16 @@ import * as THREE from 'three';
 import { markRaw, toRaw } from 'vue';
 import { getMeshKey, getObjectMeshes, requestRender } from '../core/helpers.js';
 import { isMeshSelected, updateSelectionDimmingEffect } from '../selection/selection.js';
-import { batchGroup, batchSlotByElement, clippingPlanes, selectionSlotByElement, flatMaterialCache, hoverMaterial, isCropBoxActive, isFlatShading, isWireframe, isXRayMode, overlayByElement, overlayGroup, rt, selectMaterial, selectedMeshes, xrayMaterials, xrayOpacity } from '../state/state.js';
+import { batchGroup, batchSlotByElement, clashGhostConcreteMaterial, clashGhostRebarMaterial, clashHideOtherRebar, clashModeActive, clippingPlanes, selectionSlotByElement, flatMaterialCache, hoverMaterial, isCropBoxActive, isFlatShading, isWireframe, isXRayMode, overlayByElement, overlayGroup, rt, selectMaterial, selectedMeshes, xrayMaterials, xrayOpacity } from '../state/state.js';
 import { applyModelOpacityToMaterial, getModelOpacityBase } from '../ui/panels.js';
 
 // Vật liệu hiển thị của một batch theo chế độ X-ray / Flat / bình thường
 export const getDisplayMaterial = (original, isRebar) => {
     let material;
-    if (isXRayMode.value && !isRebar) {
+    if (clashModeActive.value) {
+        // View va chạm: mô hình nền là khối xám mờ (không phụ thuộc X-ray / Flat / độ mờ model)
+        material = isRebar ? clashGhostRebarMaterial : clashGhostConcreteMaterial;
+    } else if (isXRayMode.value && !isRebar) {
         material = isFlatShading.value ? xrayMaterials.flat : xrayMaterials.lit;
         applyModelOpacityToMaterial(material, xrayOpacity.value);
     } else {
@@ -29,23 +32,27 @@ export const getDisplayMaterial = (original, isRebar) => {
         }
         applyModelOpacityToMaterial(material);
     }
+    if (clashModeActive.value) material.wireframe = false;
     const planes = isCropBoxActive.value ? clippingPlanes : null;
     if (material.clippingPlanes !== planes) {
         material.clippingPlanes = planes;
         material.needsUpdate = true;
     }
-    material.wireframe = isWireframe.value;
+    if (!clashModeActive.value) material.wireframe = isWireframe.value;
     return material;
 };
 
 export const refreshBatchMaterials = () => {
     rt.batchRecords.forEach(record => {
         record.batch.material = getDisplayMaterial(record.original, record.isRebar);
+        // Xem va chạm + "Ẩn thép không va chạm": ẩn cả batch thép (thép có va chạm được vẽ riêng ở clash.js)
+        record.batch.visible = !(clashModeActive.value && record.isRebar && clashHideOtherRebar.value);
     });
 };
 
 // Cấu kiện đang chọn được vẽ trong batch chọn riêng (rebuildSelectionBatches) nên instance gốc luôn ẩn
-const isDrawnElsewhere = (element) => overlayByElement.has(element) || selectionSlotByElement.has(element);
+// Lúc xem va chạm overlay/batch chọn bị ẩn nên instance gốc phải tự hiện (mô hình nền mờ)
+const isDrawnElsewhere = (element) => !clashModeActive.value && (overlayByElement.has(element) || selectionSlotByElement.has(element));
 
 export const setBatchInstanceVisible = (element, visible) => {
     const slot = batchSlotByElement.get(element);

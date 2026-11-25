@@ -1,7 +1,9 @@
+import { markHistorySaved } from '../core/history.js';
 import { getMeshKey, visibleExportItems } from '../core/helpers.js';
 import { applyIfcTransportToModel, getSourceTransportMatrix } from './transport.js';
 import { applyHeaderOverrides } from './project-info.js';
-import { deletedItems, editHistoryCount, fileName, hasUnsavedChanges, isLoading, isSampleModel, loadingText, pendingDeletedExpressIDs, rt, sourceFiles } from '../state/state.js';
+import { pruneIfcText } from './ifc-prune.js';
+import { deletedItems, fileName, isLoading, isSampleModel, loadingText, pendingDeletedExpressIDs, rt, sourceFiles } from '../state/state.js';
 import { showToast } from '../ui/panels.js';
 import { t } from '../i18n/index.js';
 
@@ -16,8 +18,7 @@ export const exportModifiedIFC = () => {
         loadingText.value = t('Đang tạo IFC kết hợp và áp dụng danh sách xóa...');
         const data = createFilteredIfcData('edited');
         downloadIfcData(data, sourceFiles.value.length > 1 ? '_combined_edited' : '_edited');
-        editHistoryCount.value = 0;
-        hasUnsavedChanges.value = false;
+        markHistorySaved();
         showToast(t('Xuất tệp thành công!'), t('Đã lưu IFC với {0} cấu kiện đã xóa.', [pendingDeletedExpressIDs.size]), 'success');
 
     } catch (err) {
@@ -111,13 +112,13 @@ export const createFilteredIfcData = (mode) => {
                 });
             }
 
-            removeDeletedProductsFromRelationships(tempModelID, idsToDelete);
-            idsToDelete.forEach(id => {
-                if (rt.ifcAPI.GetLineType(tempModelID, id) !== 0) rt.ifcAPI.DeleteLine(tempModelID, id);
-            });
             const result = rt.ifcAPI.SaveModel(tempModelID);
             if (!result || result.length === 0) throw new Error(t('Dữ liệu IFC xuất ra từ "{0}" rỗng.', [source.name]));
-            return result;
+            if (idsToDelete.size === 0) return result;
+            // Xóa cấu kiện kèm hình học, placement, Pset... chỉ thuộc về chúng (trước đây chỉ xóa dòng cấu kiện,
+            // phần còn lại thành rác mồ côi nên file chia tách gần như không nhỏ đi)
+            const pruned = pruneIfcText(new TextDecoder('utf-8').decode(result), idsToDelete);
+            return new TextEncoder().encode(pruned.text);
         } finally {
             rt.ifcAPI.CloseModel(tempModelID);
         }
@@ -194,45 +195,6 @@ export const mergeIfcData = (buffers) => {
 
     const combinedText = `${outputHeader}\nDATA;\n${combinedDataSections.join('\n')}\nENDSEC;\nEND-ISO-10303-21;\n`;
     return encoder.encode(combinedText);
-};
-
-export const removeDeletedProductsFromRelationships = (modelID, deletedIds) => {
-    if (deletedIds.size === 0) return;
-    const relationUpdates = [];
-    const relationDeletes = [];
-    const lineIds = rt.ifcAPI.GetAllLines(modelID);
-
-    for (let i = 0; i < lineIds.size(); i++) {
-        const expressID = lineIds.get(i);
-        const typeName = (rt.ifcAPI.GetNameFromTypeCode(rt.ifcAPI.GetLineType(modelID, expressID)) || '').toUpperCase();
-        if (!typeName.startsWith('IFCREL')) continue;
-        const relation = rt.ifcAPI.GetLine(modelID, expressID, false);
-        if (!relation) continue;
-
-        let changed = false;
-        let shouldDelete = false;
-        Object.keys(relation).forEach(key => {
-            if (!/^(Related|Relating)/i.test(key)) return;
-            const value = relation[key];
-            if (Array.isArray(value)) {
-                const filtered = value.filter(reference =>
-                    !(reference && typeof reference === 'object' && deletedIds.has(Number(reference.value))));
-                if (filtered.length !== value.length) {
-                    relation[key] = filtered;
-                    changed = true;
-                    if (filtered.length === 0 && /^Related/i.test(key)) shouldDelete = true;
-                }
-            } else if (value && typeof value === 'object' && deletedIds.has(Number(value.value))) {
-                shouldDelete = true;
-            }
-        });
-
-        if (shouldDelete) relationDeletes.push(expressID);
-        else if (changed) relationUpdates.push(relation);
-    }
-
-    relationUpdates.forEach(relation => rt.ifcAPI.WriteLine(modelID, relation));
-    relationDeletes.forEach(expressID => rt.ifcAPI.DeleteLine(modelID, expressID));
 };
 
 export const downloadIfcData = (data, suffix) => {
