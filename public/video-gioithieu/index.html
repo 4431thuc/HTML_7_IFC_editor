@@ -25,7 +25,7 @@
   .seg div:hover{background:#2a3a5c}
   #sc{font:600 14px Inter,sans-serif;color:#94a3b8;min-width:54px;text-align:center}
   .grp{display:flex}
-  .grp button:first-child{border-radius:10px 0 0 10px}.grp button:last-child{border-radius:0 10px 10px 0;margin-left:-1px}
+  .grp button{border-radius:0 !important;margin-left:-1px}.grp button:first-child{border-radius:10px 0 0 10px !important;margin-left:0}.grp button:last-child{border-radius:0 10px 10px 0 !important}
   #warn{font-size:13px;color:#fbbf24;width:100%;display:none;line-height:1.4}
   #start{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;
     background:radial-gradient(800px 500px at 50% 45%,rgba(37,99,235,.25),rgba(3,6,12,.75));cursor:pointer}
@@ -36,7 +36,7 @@
   #start .s{font-size:14px;color:#94a3b8;max-width:560px;text-align:center;line-height:1.5}
   body.fs #ctrl{position:fixed;left:0;right:0;bottom:0;opacity:0;transition:opacity .3s}
   body.fs #ctrl:hover, body.fs.mouse #ctrl{opacity:1}
-  html[data-lang=vi] .en, html[data-lang=en] .vi{display:none}
+  html[data-lang=vi] .en, html[data-lang=vi] .de, html[data-lang=en] .vi, html[data-lang=en] .de, html[data-lang=de] .vi, html[data-lang=de] .en{display:none}
 </style>
 </head>
 <body>
@@ -45,17 +45,17 @@
     <canvas id="cv" width="1920" height="1080"></canvas>
     <div id="start">
       <div class="btn"><svg width="54" height="54" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="#fff"/></svg></div>
-      <div class="t"><span class="vi">BẤM ĐỂ PHÁT</span><span class="en">CLICK TO PLAY</span></div>
-      <div class="s"><span class="vi">Giọng đọc dùng Web Speech API của trình duyệt. Nên mở bằng Microsoft Edge để có giọng tiếng Việt tự nhiên (HoaiMy / NamMinh).</span><span class="en">Narration uses the browser's Web Speech API. Microsoft Edge offers the most natural voices.</span></div>
+      <div class="t"><span class="vi">BẤM ĐỂ PHÁT</span><span class="en">CLICK TO PLAY</span><span class="de">KLICKEN ZUM ABSPIELEN</span></div>
+      <div class="s"><span class="vi">Giọng đọc dùng Web Speech API của trình duyệt. Nên mở bằng Microsoft Edge để có giọng tiếng Việt tự nhiên (HoaiMy / NamMinh).</span><span class="en">Narration uses the browser's Web Speech API. Microsoft Edge offers the most natural voices.</span><span class="de">Die Sprachausgabe nutzt die Web Speech API des Browsers. Microsoft Edge bietet die natürlichsten Stimmen (z. B. Katja / Conrad).</span></div>
     </div>
   </div>
   <div id="ctrl">
-    <button id="play">▶ <span class="vi">Phát</span><span class="en">Play</span></button>
+    <button id="play">▶ <span class="vi">Phát</span><span class="en">Play</span><span class="de">Abspielen</span></button>
     <button id="prev" title="←">⏮</button>
     <button id="next" title="→">⏭</button>
     <span id="sc">1 / 12</span>
     <div class="seg" id="seg"></div>
-    <div class="grp"><button id="lvi">VI</button><button id="len">EN</button></div>
+    <div class="grp"><button id="lvi">VI</button><button id="len">EN</button><button id="lde">DE</button></div>
     <select id="voice" title="Giọng đọc / Voice"></select>
     <select id="rate" title="Tốc độ / Speed">
       <option value="0.9">0.9×</option><option value="1" selected>1×</option><option value="1.1">1.1×</option><option value="1.2">1.2×</option>
@@ -167,6 +167,8 @@ const T = {
     rCost: 'Chi phí / người / năm', rRemove: 'Xóa đối tượng khỏi IFC', rMerge: 'Gộp nhiều IFC thành 1 file', rEdit: 'Sửa thuộc tính & lưu vào IFC',
     rMove: 'Dịch chuyển, xoay & lưu IFC', rCoupler: 'Nhận diện coupler / đầu ren', rClash: 'Kiểm tra va chạm', rDiff: 'So sánh 2 IFC', soon: 'Sắp có',
     tTeam: 'Tự làm được, gần như không tốn gì', nLicense: 'phí license', nLicenseSub: 'cho MACZT + MACeng', nDev: 'người phát triển', nMonths: 'tháng',
+    tPrices: 'Phần mềm IFC trả phí', tViewOnly: 'Trả tiền… nhưng chỉ để xem', fileSize: 'Dung lượng file: 57 MB →',
+    costRow: ['0 €', '€720', '$349–499', '€1.428–2.109'], zero: '0 €',
     tagline1: 'Chúng ta không chỉ dùng phần mềm.', tagline2: 'Chúng ta có thể tự làm ra phần mềm.'
   },
   en: {
@@ -186,9 +188,15 @@ const T = {
     rCost: 'Cost / user / year', rRemove: 'Remove objects from IFC', rMerge: 'Merge IFCs into one file', rEdit: 'Edit attributes & save to IFC',
     rMove: 'Move, rotate & save IFC', rCoupler: 'Coupler / threaded-end detection', rClash: 'Clash detection', rDiff: 'Compare 2 IFCs', soon: 'Soon',
     tTeam: 'Built in-house, at almost no cost', nLicense: 'license fees', nLicenseSub: 'for MACZT + MACeng', nDev: 'developer', nMonths: 'month',
+    tPrices: 'Paid IFC software', tViewOnly: 'You pay… just to look', fileSize: 'File size: 57 MB →',
+    costRow: ['€0', '€720', '$349–499', '€1,428–2,109'], zero: '€0',
     tagline1: "We don't just use software.", tagline2: 'We can build it ourselves.'
-  }
+  },
+  de: {"eyeProblem": "DAS PROBLEM", "eyeSolution": "DIE LÖSUNG", "eyeViewer": "TIEFER EINBLICK", "eyeConnect": "DER UNTERSCHIED", "eyeClash": "KOLLISIONSPRÜFUNG", "eyeMeasure": "MESSEN", "eyeEdit": "MEHR ALS EIN VIEWER", "eyeCompare": "VERGLEICH", "eyeTeam": "KOSTEN", "perYear": "/ Nutzer / Jahr", "perLicense": "/ Lizenz / Jahr", "timesUsers": "× Anzahl Nutzer × jedes Jahr", "viewOnly": "NUR ANSEHEN", "noRemove": "Keine Objekte aus der IFC löschen", "noMerge": "Keine IFCs zu einer Datei zusammenführen", "noEdit": "Keine Eigenschaften bearbeiten und in IFC speichern", "tSolution": "Browser öffnen und loslegen", "noInstall": "Keine Installation", "local": "Dateien lokal verarbeitet, nie hochgeladen", "tViewer": "Mehrere Dateien · nach Pos. gruppieren · CropBox · Röntgen", "cGroup": "Nach Positionsnummer gruppieren & einfärben", "cCrop": "CropBox mit 6 Flächen", "cXray": "Röntgenansicht Bewehrung", "tConnect": "Versteht Muffen und Gewindeenden", "cCoupler": "Muffe Ø42 × 100", "cHosts": "2 Stäbe Ø28 · Achsversatz 0,0 mm", "fConn": "Erkennt Muffen, Gewindeenden ↔ Stäbe", "fDup": "Findet doppelt platzierte Stäbe / Muffen", "tClash": "Nur echte Kollisionen", "sSkip": "Paare Muffe ↔ Stab übersprungen", "sReal": "echte Kollisionen", "cLabel": "Pos.-Nr. + Ø beider Stäbe", "cList": "Sortiert nach Überschneidungsvolumen", "tMeasure": "Fang auf Kante, Ecke und Lot", "cDim1": "Stababstand 12,5 cm", "cDim2": "Stablänge 1,40 m", "cDimList": "Projektkoordinaten X, Y, Z", "tEdit": "Bearbeiten und zurück in IFC speichern", "cPset": "Pset-Wert bearbeiten → in IFC geschrieben", "cTransport": "Drehen + Verschieben pro Datei", "cSplit": "Sichtbares abtrennen", "undo": "Jede Änderung lässt sich rückgängig machen", "tCompare": "IFC Rebar BIM Editor vs. kostenpflichtige Software", "colFeature": "Funktion", "rCost": "Kosten / Nutzer / Jahr", "rRemove": "Objekte aus IFC entfernen", "rMerge": "IFCs zu einer Datei zusammenführen", "rEdit": "Attribute bearbeiten & in IFC speichern", "rMove": "Verschieben, drehen & IFC speichern", "rCoupler": "Erkennung Muffen / Gewindeenden", "rClash": "Kollisionsprüfung", "rDiff": "2 IFCs vergleichen", "soon": "Bald", "tTeam": "Selbst gebaut, fast ohne Kosten", "nLicense": "Lizenzgebühren", "nLicenseSub": "für MACZT + MACeng", "nDev": "Entwickler", "nMonths": "Monat", "tagline1": "Wir nutzen Software nicht nur.", "tagline2": "Wir können sie selbst bauen.", "tPrices": "Kostenpflichtige IFC-Software", "tViewOnly": "Bezahlen… nur zum Ansehen", "fileSize": "Dateigröße: 57 MB →", "costRow": ["0 €", "720 €", "349–499 $", "1.428–2.109 €"], "zero": "0 €"}
 };
+// Lời thoại + phụ đề tiếng Đức, theo đúng thứ tự cảnh / câu của SCENES
+const DE_LINES = [[{"de": "Jedes Jahr zahlen Planungsbüros Tausende Euro pro Arbeitsplatz für Software, mit der man IFC-Modelle ansieht und prüft."}], [{"de": "BIMcollab Zoom: 720 € pro Jahr.", "deSay": "BIMcollab Zoom: 720 Euro pro Jahr."}, {"de": "Trimble Connect: 349 bis 499 $.", "deSay": "Trimble Connect: 349 bis 499 Dollar."}, {"de": "Solibri: 1.428 bis 2.109 €.", "deSay": "Solibri: 1428 bis 2109 Euro."}, {"de": "Und das gilt pro Nutzer, jedes Jahr."}], [{"de": "Doch die meisten sind nur zum Ansehen gedacht."}, {"de": "Man kann keine Objekte löschen, keine Dateien zusammenführen und keine Eigenschaften bearbeiten und in die IFC zurückspeichern."}], [{"de": "Deshalb haben wir unser eigenes Werkzeug gebaut: IFC Rebar BIM Editor."}, {"de": "Es läuft direkt im Browser, ohne Installation."}, {"de": "IFC-Dateien werden auf dem eigenen Rechner verarbeitet und nie hochgeladen."}], [{"de": "Mehrere IFC-Dateien gleichzeitig öffnen, nach Positionsnummer, Name oder Bauteiltyp gruppieren und einfärben."}, {"de": "CropBox und Röntgenmodus zeigen auch das Innere dichter Bewehrungskörbe."}], [{"de": "Bei IFC-Dateien aus Allplan erkennen andere IFC-Viewer nicht, an welchen Stäben eine Muffe sitzt."}, {"de": "IFC Rebar BIM Editor erkennt Muffen, Gewindeenden und die zugehörigen Stäbe automatisch."}, {"de": "Außerdem findet er Stäbe oder Muffen, die doppelt an derselben Stelle liegen."}], [{"de": "Bei der Kollisionsprüfung werden 13.145 Paare aus Muffe und Stab automatisch übersprungen.", "deSay": "Bei der Kollisionsprüfung werden 13145 Paare aus Muffe und Stab automatisch übersprungen."}, {"de": "Übrig bleiben nur 1.445 echte Kollisionen, sortiert nach Überschneidungsvolumen.", "deSay": "Übrig bleiben nur 1445 echte Kollisionen, sortiert nach Überschneidungsvolumen."}, {"de": "Jede Kollision nennt beide Stäbe mit Positionsnummer und Durchmesser, ein Klick zoomt direkt hin."}], [{"de": "Messungen fangen Kanten, Ecken und Lotpunkte, in echten Projektkoordinaten."}], [{"de": "Und anders als kommerzielle Viewer schreibt das Werkzeug Änderungen zurück in die IFC-Datei."}, {"de": "Attribute und Property Sets bearbeiten, die Lage jeder Datei verschieben und drehen."}, {"de": "Sichtbares abtrennen: Eine 57-MB-Datei mit 15 behaltenen Wänden schrumpft auf 14 KB.", "deSay": "Sichtbares abtrennen: Eine Datei mit 57 Megabyte, von der 15 Wände behalten werden, schrumpft auf 14 Kilobyte."}, {"de": "Und jede Änderung lässt sich rückgängig machen."}], [{"de": "Im Vergleich mit kostenpflichtiger Software kann es vieles, was diese nicht kann."}, {"de": "Wo sie noch vorne liegt, etwa beim IFC-Vergleich, wird bereits entwickelt."}], [{"de": "Das Ganze wurde von einer Person in einem Monat entwickelt."}, {"de": "Keine Lizenzgebühren für MACZT und MACeng.", "deSay": "Keine Lizenzgebühren für M A C Z T und MAC eng."}], [{"de": "Wir nutzen Software nicht nur."}, {"de": "Wir können sie selbst bauen."}]];
+SCENES.forEach((sc, i) => sc.lines.forEach((ln, j) => Object.assign(ln, DE_LINES[i][j])));
 
 // ==================================================================================
 //  Trạng thái phát
@@ -200,6 +208,7 @@ const S = {
   tasks: [], subtitle: '', subAt: 0, cc: true, rate: 1, music: true
 };
 try { S.lang = localStorage.getItem('ifcVideoLang') || 'vi'; } catch (e) {}
+if (!['vi', 'en', 'de'].includes(S.lang)) S.lang = 'vi';
 
 const sceneT = () => S.clock - S.sceneStart;
 // Thời điểm câu thứ i của cảnh hiện tại bắt đầu (giây trong cảnh), Infinity nếu chưa tới
@@ -218,7 +227,7 @@ const runTasks = () => {
 // ==================================================================================
 const synth = window.speechSynthesis;
 let voices = [];
-const chosenVoice = { vi: '', en: '' };
+const chosenVoice = { vi: '', en: '', de: '' };
 try { Object.assign(chosenVoice, JSON.parse(localStorage.getItem('ifcVideoVoices') || '{}')); } catch (e) {}
 
 const scoreVoice = (v, lang) => {
@@ -226,6 +235,7 @@ const scoreVoice = (v, lang) => {
   if (/natural|online|neural/i.test(v.name)) s += 4;
   if (lang === 'vi' && /hoaimy|namminh/i.test(v.name)) s += 3;
   if (lang === 'en' && /^en-(us|gb)/i.test(v.lang)) s += 1;
+  if (lang === 'de' && /^de-de/i.test(v.lang)) s += 1;
   if (/google/i.test(v.name)) s += 1;
   return s;
 };
@@ -243,19 +253,21 @@ const fillVoices = () => {
   const cur = currentVoice();
   sel.innerHTML = list.length
     ? list.map(v => `<option value="${v.name.replace(/"/g, '&quot;')}"${cur && v.name === cur.name ? ' selected' : ''}>${v.name}</option>`).join('')
-    : `<option>${S.lang === 'vi' ? 'Không có giọng tiếng Việt' : 'No English voice'}</option>`;
+    : `<option>${({ vi: 'Không có giọng tiếng Việt', en: 'No English voice', de: 'Keine deutsche Stimme' })[S.lang]}</option>`;
   const warn = document.getElementById('warn');
   if (!synth) { warn.style.display = 'block'; warn.textContent = 'Trình duyệt không hỗ trợ Web Speech API: video chạy theo phụ đề.'; return; }
   if (!list.length) {
     warn.style.display = 'block';
-    warn.textContent = S.lang === 'vi'
-      ? 'Máy này chưa có giọng đọc tiếng Việt: video vẫn chạy, phụ đề hiện theo thời gian ước tính. Mở bằng Microsoft Edge (giọng HoaiMy / NamMinh) hoặc cài gói ngôn ngữ tiếng Việt cho Windows.'
-      : 'No English voice found: the video runs with timed subtitles only.';
+    warn.textContent = ({
+      vi: 'Máy này chưa có giọng đọc tiếng Việt: video vẫn chạy, phụ đề hiện theo thời gian ước tính. Mở bằng Microsoft Edge (giọng HoaiMy / NamMinh) hoặc cài gói ngôn ngữ tiếng Việt cho Windows.',
+      en: 'No English voice found: the video runs with timed subtitles only.',
+      de: 'Keine deutsche Stimme gefunden: das Video läuft mit zeitgesteuerten Untertiteln. In Microsoft Edge gibt es natürliche Stimmen (Katja / Conrad).'
+    })[S.lang];
   } else warn.style.display = 'none';
 };
 if (synth) { fillVoices(); synth.onvoiceschanged = fillVoices; }
 
-const estimate = (text) => (text.length / (S.lang === 'vi' ? 13.5 : 15) + 0.5) / S.rate;
+const estimate = (text) => (text.length / ({ vi: 13.5, en: 15, de: 14 })[S.lang] + 0.5) / S.rate;
 const GAP = 0.35; // nghỉ giữa 2 câu
 
 const speakLine = () => {
@@ -558,7 +570,7 @@ const ring = (map, px, py, r, p, color = C.amber) => {
   ctx.restore();
 };
 // Thẻ số liệu (đếm số chạy lên)
-const fmt = (n) => S.lang === 'vi' ? n.toLocaleString('de-DE') : n.toLocaleString('en-US');
+const fmt = (n) => n.toLocaleString(S.lang === 'en' ? 'en-US' : 'de-DE');
 const statCard = (x, y, w, h, value, label, p, color = C.lgreen, o = {}) => {
   if (p <= 0) return;
   const e = ease(p);
@@ -659,7 +671,7 @@ const DRAW = {
   },
   prices(t) {
     const tx = T[S.lang];
-    heading(tx.eyeProblem, S.lang === 'vi' ? 'Phần mềm IFC trả phí' : 'Paid IFC software', t);
+    heading(tx.eyeProblem, tx.tPrices, t);
     const data = [
       ['BIMcollab', 'Zoom', (e) => '€' + countTo(720, e), tx.perYear],
       ['Trimble Connect', 'Pro · Innovate', (e) => '$' + countTo(349, e) + '–' + countTo(499, e), tx.perYear],
@@ -690,7 +702,7 @@ const DRAW = {
   },
   viewonly(t) {
     const tx = T[S.lang];
-    heading(tx.eyeProblem, S.lang === 'vi' ? 'Trả tiền… nhưng chỉ để xem' : 'You pay… just to look', t);
+    heading(tx.eyeProblem, tx.tViewOnly, t);
     const p = ease(ramp(t, L(0), 0.8));
     // con mắt
     ctx.save(); ctx.globalAlpha = p; ctx.translate(W / 2, 340); ctx.scale(0.8 + p * 0.2, 0.8 + p * 0.2);
@@ -820,7 +832,7 @@ const DRAW = {
         rr(1340, 760, bw, 34, 17); ctx.fillStyle = '#1c2740'; ctx.fill();
         rr(1340, 760, cur, 34, 17); const g = ctx.createLinearGradient(1340, 0, 1840, 0); g.addColorStop(0, '#22d3ee'); g.addColorStop(1, '#10b981'); ctx.fillStyle = g; ctx.fill();
         txt(shrink < 1 ? (Math.max(1, Math.round(lerp(57, 0, shrink))) + ' MB') : '14 KB', 1340, 860, { size: 54, weight: 900, color: C.lgreen });
-        txt(S.lang === 'vi' ? 'Dung lượng file: 57 MB →' : 'File size: 57 MB →', 1340, 742, { size: 24, weight: 600, color: C.muted });
+        txt(tx.fileSize, 1340, 742, { size: 24, weight: 600, color: C.muted });
         ctx.restore();
       }
     }
@@ -843,7 +855,7 @@ const DRAW = {
     const tx = T[S.lang];
     heading(tx.eyeCompare, tx.tCompare, t);
     const cols = ['IFC Rebar BIM Editor', 'BIMcollab Zoom', 'Trimble Connect', 'Solibri'];
-    const x0 = 140, lw = 560, cw = 280, y0 = 240, rh = 72;
+    const x0 = 140, lw = 560, cw = 280, y0 = 225, rh = 70;
     const ph = ease(ramp(t, L(0), 0.6));
     ctx.save(); ctx.globalAlpha = ph;
     rr(x0 + lw, y0 - 10, cw, 100 + rh * 8 + 20, 18); ctx.fillStyle = 'rgba(59,130,246,.10)'; ctx.fill();
@@ -851,7 +863,7 @@ const DRAW = {
     txt(tx.colFeature, x0 + 10, y0 + 50, { size: 24, weight: 700, color: C.muted, ls: 2 });
     ctx.restore();
     const rows = [
-      [tx.rCost, S.lang === 'vi' ? ['0 €', '€720', '$349–499', '€1.428–2.109'] : ['€0', '€720', '$349–499', '€1,428–2,109']],
+      [tx.rCost, tx.costRow],
       [tx.rRemove, 'ynnn'], [tx.rMerge, 'yppp'], [tx.rEdit, 'yppp'], [tx.rMove, 'ypqp'], [tx.rCoupler, 'ynnn'], [tx.rClash, 'yyyy'], [tx.rDiff, 'sqyy']
     ];
     rows.forEach(([label, vals], r) => {
@@ -875,7 +887,7 @@ const DRAW = {
   team(t) {
     const tx = T[S.lang];
     heading(tx.eyeTeam, tx.tTeam, t);
-    const items = [['1', tx.nDev, 'thuc.hoang'], ['1', tx.nMonths, ''], [S.lang === 'vi' ? '0 €' : '€0', tx.nLicense, tx.nLicenseSub]];
+    const items = [['1', tx.nDev, 'thuc.hoang'], ['1', tx.nMonths, ''], [tx.zero, tx.nLicense, tx.nLicenseSub]];
     items.forEach(([big, lab, sub], i) => {
       const start = i < 2 ? L(0) + i * 1.2 : L(1);
       const q = ease(ramp(t, start, 0.7));
@@ -964,10 +976,11 @@ const updateProgress = () => {
   [...seg.children].forEach((d, i) => { d.firstChild.style.width = (i < S.scene ? 100 : i > S.scene ? 0 : frac * 100) + '%'; });
 };
 const updateUi = () => {
-  $('play').innerHTML = S.playing ? '❚❚ <span class="vi">Dừng</span><span class="en">Pause</span>' : '▶ <span class="vi">Phát</span><span class="en">Play</span>';
+  $('play').innerHTML = S.playing ? '❚❚ <span class="vi">Dừng</span><span class="en">Pause</span><span class="de">Pause</span>' : '▶ <span class="vi">Phát</span><span class="en">Play</span><span class="de">Abspielen</span>';
   $('sc').textContent = `${S.scene + 1} / ${SCENES.length}`;
   $('lvi').classList.toggle('on', S.lang === 'vi');
   $('len').classList.toggle('on', S.lang === 'en');
+  $('lde').classList.toggle('on', S.lang === 'de');
   $('cc').classList.toggle('on', S.cc);
   $('mus').classList.toggle('on', S.music);
   document.documentElement.dataset.lang = S.lang;
@@ -993,6 +1006,7 @@ $('prev').onclick = () => jump(S.scene - 1);
 $('next').onclick = () => jump(S.scene + 1);
 $('lvi').onclick = () => setLang('vi');
 $('len').onclick = () => setLang('en');
+$('lde').onclick = () => setLang('de');
 $('voice').onchange = (e) => {
   chosenVoice[S.lang] = e.target.value;
   try { localStorage.setItem('ifcVideoVoices', JSON.stringify(chosenVoice)); } catch (er) {}
@@ -1013,7 +1027,7 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowLeft') $('prev').click();
   else if (e.key === 'f' || e.key === 'F') toggleFs();
   else if (e.key === 'c' || e.key === 'C') $('cc').click();
-  else if (e.key === 'l' || e.key === 'L') setLang(S.lang === 'vi' ? 'en' : 'vi');
+  else if (e.key === 'l' || e.key === 'L') setLang(({ vi: 'en', en: 'de', de: 'vi' })[S.lang]);
 });
 
 // Canvas luôn vừa khung, giữ tỉ lệ 16:9
@@ -1027,7 +1041,7 @@ new ResizeObserver(fit).observe($('view'));
 // Dừng giọng đọc khi rời trang
 addEventListener('beforeunload', () => synth && synth.cancel());
 
-// Xem trước một khung hình tĩnh (dùng khi kiểm tra): __preview(cảnh, câu, giây sau khi câu bắt đầu, 'vi'|'en')
+// Xem trước một khung hình tĩnh (dùng khi kiểm tra): __preview(cảnh, câu, giây sau khi câu bắt đầu, 'vi'|'en'|'de')
 window.__preview = (scene, line, sec, lang) => {
   if (lang) { S.lang = lang; updateUi(); }
   S.started = true; S.playing = false; $('start').style.display = 'none';
