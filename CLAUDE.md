@@ -61,6 +61,7 @@ Dự án dùng **Vite** + npm (Node.js cài bản portable tại `C:\Users\Thuc.
 
 ## Ghi chú
 
+- `public/slide-gioithieu/`, `public/video-gioithieu/` (ảnh chung `public/gioithieu-img/`): trang giới thiệu tĩnh, Vite chép nguyên vào `dist/`, không qua bundler. Ảnh tham chiếu bằng đường dẫn tương đối `../gioithieu-img/` để chạy được cả khi site nằm trong thư mục con của GitHub Pages. Dev server (`npm run dev`) trả trang app cho `/slide-gioithieu/`, phải mở `/slide-gioithieu/index.html` hoặc dùng `npx vite preview` sau khi build.
 - `version.md` là nhật ký thay đổi và danh sách việc cần làm của tác giả (tiếng Việt). Cập nhật khi hoàn thành tính năng.
 - File IFC mẫu (~20 MB) đang được git theo dõi; hạn chế commit thêm file nhị phân lớn.
 - Thư mục dự án nằm trong OneDrive: `node_modules/` có hàng nghìn file và sẽ bị đồng bộ. Cân nhắc loại trừ thư mục này khỏi OneDrive.

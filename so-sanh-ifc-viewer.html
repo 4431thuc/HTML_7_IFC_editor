@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>So sánh chức năng IFC Viewer</title>
+<style>
+  :root{
+    --blue:#1f6fd1; --ink:#2b2b2b; --muted:#6b6b6b; --line:#e8e8e8; --hl:#f4f8fe;
+    /* 14 table rows share the space left after title + header + footer */
+    --rowh: clamp(30px, calc((100vh - 300px) / 14), 52px);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:#fff;color:var(--ink);overflow:hidden;
+    font-family:Lato,"Segoe UI","Helvetica Neue",Arial,sans-serif;font-size:14px}
+  .page{height:100vh;max-width:1360px;margin:0 auto;padding:12px 28px 8px;display:flex;flex-direction:column}
+  .grid{display:grid;grid-template-columns:minmax(240px,1.35fr) repeat(4,1fr);align-items:center}
+
+  /* top bar */
+  .top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .top h1{margin:0;font-size:21px;font-weight:800}
+  .top p{margin:2px 0 0;color:var(--muted);font-size:13px}
+  .right{display:flex;align-items:center;gap:18px}
+  .legend{display:flex;gap:14px;color:var(--muted);font-size:12.5px;flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .legend .ic{width:18px;height:18px}
+  .lang{display:flex;border:1.5px solid #333;border-radius:999px;overflow:hidden;flex:none}
+  .lang button{border:0;background:#fff;padding:4px 12px;font:700 12px Lato,"Segoe UI",Arial,sans-serif;
+    letter-spacing:.08em;cursor:pointer;color:#333}
+  .lang button.on{background:#333;color:#fff}
+
+  /* column header */
+  .head{padding:10px 0 10px;box-shadow:0 6px 8px -8px rgba(0,0,0,.18);margin-top:6px}
+  .head .col{text-align:center;padding:6px 6px}
+  .brand{font-weight:300;letter-spacing:.03em;color:#444;font-size:12.5px;text-transform:uppercase}
+  .ed{font-weight:800;font-size:15px;margin:1px 0 6px;text-transform:uppercase}
+  .pill{display:inline-block;border:1.5px solid #333;border-radius:999px;padding:3px 12px;
+    font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#333;white-space:nowrap}
+  .pill.free{border-color:var(--blue);color:var(--blue);font-weight:700}
+  .sub{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .head .me{background:var(--hl);border-radius:6px 6px 0 0}
+  .head .me .ed{color:var(--blue)}
+
+  .sec{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+    padding:8px 0 4px;border-bottom:1px solid var(--line);color:#444}
+  .row{border-bottom:1px solid var(--line);height:var(--rowh)}
+  .row > div{height:100%;display:flex;align-items:center;padding:0 8px}
+  .row .c{justify-content:center;text-align:center}
+  .row .me{background:var(--hl)}
+  .label{gap:7px;line-height:1.25;font-size:13.5px}
+
+  .info{position:relative;flex:none;width:15px;height:15px;border:1.3px solid #555;border-radius:50%;
+    font:italic 600 9.5px/12px Georgia,serif;text-align:center;color:#555;cursor:help}
+  .info .tip{display:none;position:absolute;left:22px;top:50%;transform:translateY(-50%);width:340px;
+    background:#2b2b2b;color:#fff;font:12.5px/1.5 Lato,"Segoe UI",Arial,sans-serif;font-style:normal;
+    text-align:left;padding:9px 12px;border-radius:6px;z-index:9;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  .info:hover .tip,.info:focus .tip{display:block}
+
+  .ic{width:22px;height:22px;display:inline-block;vertical-align:middle}
+  .txt{font-size:12.5px;color:var(--muted)}
+  .soon{display:inline-block;background:#e8f0fb;color:var(--blue);border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .money{font-weight:700;font-size:14px;gap:6px}
+  .money small{font-weight:400;color:var(--muted);font-size:11.5px}
+
+  .foot{color:var(--muted);font-size:11.5px;margin-top:auto;padding-top:6px}
+
+  @media (max-width:900px){
+    body{overflow:auto}
+    .page{height:auto;padding:10px}
+    .scroll{overflow-x:auto}
+    .scroll > div{min-width:860px}
+    :root{--rowh:42px}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="yes" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#1f6fd1" stroke-width="1.5"/><path d="M7.3 12.4l3.1 3.1 6.3-6.6" fill="none" stroke="#1f6fd1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="part" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#e0a100" stroke-width="1.5"/><path d="M12 1.5a10.5 10.5 0 0 1 0 21z" fill="#e0a100"/></symbol>
+    <symbol id="no" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#c8423b" stroke-width="1.5"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" stroke="#c8423b" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="ask" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#9a9a9a" stroke-width="1.5" stroke-dasharray="3 2.4"/><text x="12" y="16.5" text-anchor="middle" font-size="13" font-family="Arial" font-weight="700" fill="#9a9a9a">?</text></symbol>
+  </defs>
+</svg>
+
+<div class="page">
+  <div class="top">
+    <div>
+      <h1 data-t="title"></h1>
+      <p data-t="subtitle"></p>
+    </div>
+    <div class="right">
+      <div class="legend">
+        <span><svg class="ic"><use href="#yes"/></svg><b data-t="lgYes"></b></span>
+        <span><svg class="ic"><use href="#part"/></svg><b data-t="lgPart"></b></span>
+        <span><svg class="ic"><use href="#no"/></svg><b data-t="lgNo"></b></span>
+        <span><svg class="ic"><use href="#ask"/></svg><b data-t="lgAsk"></b></span>
+        <span><span class="soon">Coming soon</span></span>
+      </div>
+      <div class="lang">
+        <button id="btn-vi" onclick="setLang('vi')">VI</button>
+        <button id="btn-en" onclick="setLang('en')">EN</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="scroll"><div>
+    <div class="grid head" id="head"></div>
+    <div class="sec" data-t="secCost"></div>
+    <div id="cost"></div>
+    <div class="sec" data-t="secFeat"></div>
+    <div id="features"></div>
+  </div></div>
+
+  <div class="foot" data-t="foot"></div>
+</div>
+
+<script>
+const T = {
+  vi: {
+    title: "So sánh chức năng IFC Viewer",
+    subtitle: "ifceditor.macztasia.com so với bản thuê có phí của BIMcollab Zoom, Trimble Connect và Solibri",
+    lgYes: "Có", lgPart: "Một phần", lgNo: "Không", lgAsk: "Cần kiểm tra",
+    secCost: "Chi phí", secFeat: "Chức năng",
+    foot: "Giá tra cứu 11/2026 trên trang chính hãng, chưa gồm VAT, có thể khác theo khu vực/đại lý. Rê chuột vào biểu tượng i để xem ghi chú.",
+    year: "năm", free: "Miễn phí",
+    heads: [
+      ["IFC Editor","macztasia","Miễn phí","Web, không cần cài đặt"],
+      ["BIMcollab","Zoom","€720 / năm","License đơn · floating €900/năm"],
+      ["Trimble Connect","Pro · Innovate","$349 – $499 / năm","Mỗi user · Enterprise báo giá"],
+      ["Solibri","Essential · Advanced","€1.428 – €2.109 / năm","Mỗi license · Premium €2.772"]
+    ],
+    cost: [
+      ["Nền tảng", ["Web","Desktop Windows","Web + Desktop + Mobile","Desktop"]],
+      ["Hình thức", ["Không tốn phí license cho MACZT + MACeng","Chỉ thuê theo tháng/năm","Thuê theo user/năm","Chỉ thuê, không bán vĩnh viễn"]]
+    ],
+    costYear: "Chi phí 1 người / năm",
+    costVals: ["0","€720","$349 <small>· Innovate $499</small>","€1.428 <small>· Advanced €2.109</small>"],
+    feats: [
+      ["Viewer model + CropBox + hide/show","Cả 4 đều có hộp cắt (section/clipping box) và ẩn/hiện đối tượng."],
+      ["Explorer cây đối tượng / chuyên cho thép","ifceditor: chưa có cây phân cấp đầy đủ (chỉ nhóm theo Pos/tên/type), nhưng là bên duy nhất có bảng thống kê thép theo Pos + đường kính (số lượng, chiều dài, khối lượng), xuất CSV/Excel. 3 phần mềm kia có cây model nhưng không có explorer riêng cho thép."],
+      ["Remove đối tượng khỏi IFC","BIMcollab, Trimble, Solibri chỉ ẩn đối tượng khi xem, không ghi lại thành file IFC."],
+      ["Xuất riêng 1 nhóm đối tượng thành 1 IFC","ifceditor xuất các đối tượng đang hiển thị thành một file IFC mới."],
+      ["Combine nhiều IFC thành 1 và lưu lại","Các phần mềm kia gộp model để xem chung (BIMcollab lưu thành file dự án .bcp), không xuất ra một file IFC duy nhất."],
+      ["Move, rotate dự án IFC và lưu lại","ifceditor: xoay quanh trục Z + tịnh tiến, lưu profile JSON, có undo. BIMcollab Zoom và Solibri có move/rotate để căn chỉnh khi xem, không ghi vào IFC (Solibri khuyến cáo không nên dùng). Trimble: chưa xác minh được."],
+      ["Check clash va chạm","ifceditor: giữa 2 loại đối tượng, có dung sai, xếp theo thể tích va chạm. BIMcollab Zoom cần license trả phí; Solibri từ gói Essential."],
+      ["Nhận diện coupler / đầu ren và thép chủ","ifceditor nhận diện liên kết thép (coupler, đầu ren, TTP...) thuần bằng hình học vì IFC Allplan không có quan hệ nối, tìm thép chủ đi qua liên kết; gộp bản liên kết Allplan xuất trùng; clash tự bỏ qua cặp liên kết ↔ thép chủ nên chỉ còn va chạm thật. File mẫu: 1705 đầu ren + 1562 coupler tìm đủ thép chủ, 3399 bản trùng được gộp. 3 phần mềm kia chỉ xem liên kết như một đối tượng thường."],
+      ["Hệ thống đo đạc trong model","ifceditor: đo khoảng cách 2 điểm, bắt cạnh, lưu danh sách phép đo."],
+      ["Show và edit attribute","Chỉ ifceditor sửa và lưu ngược vào IFC (tên, type, tag, mô tả, property set). Các phần mềm kia xem được; thuộc tính thêm (Smart Properties, property set của Trimble) nằm trong phần mềm, không ghi vào IFC."],
+      ["Compare 2 IFC / show difference","Trimble Connect có 3D Model Comparison (tạo model hiển thị khác biệt). Solibri có rule Model Comparison. ifceditor: đang phát triển."]
+    ]
+  },
+  en: {
+    title: "IFC Viewer Feature Comparison",
+    subtitle: "ifceditor.macztasia.com vs. the paid subscriptions of BIMcollab Zoom, Trimble Connect and Solibri",
+    lgYes: "Yes", lgPart: "Partial", lgNo: "No", lgAsk: "To be verified",
+    secCost: "Cost", secFeat: "Features",
+    foot: "Prices checked Nov 2026 on vendors' official sites, excl. VAT; may vary by region/reseller. Hover the i icon for details.",
+    year: "year", free: "Free",
+    heads: [
+      ["IFC Editor","macztasia","Free","Web, no installation"],
+      ["BIMcollab","Zoom","€720 / year","Single license · floating €900/yr"],
+      ["Trimble Connect","Pro · Innovate","$349 – $499 / year","Per user · Enterprise on quote"],
+      ["Solibri","Essential · Advanced","€1,428 – €2,109 / year","Per license · Premium €2,772"]
+    ],
+    cost: [
+      ["Platform", ["Web","Windows desktop","Web + Desktop + Mobile","Desktop"]],
+      ["Licensing", ["No license fees for MACZT + MACeng","Subscription only (monthly/yearly)","Per user per year","Subscription only, no perpetual"]]
+    ],
+    costYear: "Cost per user / year",
+    costVals: ["0","€720","$349 <small>· Innovate $499</small>","€1,428 <small>· Advanced €2,109</small>"],
+    feats: [
+      ["Model viewer + CropBox + hide/show","All four offer a section/clipping box and hide/show of objects."],
+      ["Object tree explorer / rebar-specific explorer","ifceditor: no full hierarchical tree yet (groups by Pos/name/type), but it is the only one with a rebar schedule by Pos + diameter (count, length, weight), exportable to CSV/Excel. The other three have a model tree but no rebar-specific explorer."],
+      ["Remove objects from IFC","BIMcollab, Trimble and Solibri only hide objects while viewing; nothing is written back to an IFC file."],
+      ["Export a group of objects as a new IFC","ifceditor exports the currently visible objects into a new IFC file."],
+      ["Combine multiple IFCs into one and save","The others federate models for viewing (BIMcollab saves a .bcp project file) but do not write a single merged IFC."],
+      ["Move / rotate IFC project and save","ifceditor: rotate about Z + translate, JSON transform profiles, undo. BIMcollab Zoom and Solibri can move/rotate for alignment while viewing, not written to IFC (Solibri advises against it). Trimble: not verified."],
+      ["Clash detection","ifceditor: between two element types, with tolerance, ranked by overlap volume. BIMcollab Zoom needs a paid license; Solibri from Essential."],
+      ["Coupler / threaded-end detection with host bars","ifceditor detects rebar connections (couplers, threaded ends, TTP...) purely from geometry, since Allplan IFC has no connection relationships, and finds the host bars passing through them; merges Allplan's duplicated connector exports; clash detection skips connector ↔ host-bar pairs so only real clashes remain. Sample model: 1705 threaded ends + 1562 couplers all matched to host bars, 3399 duplicates merged. The other three treat connectors as ordinary objects."],
+      ["Measurement tools","ifceditor: point-to-point distance with edge snapping and a saved measurement list."],
+      ["Show and edit attributes","Only ifceditor edits and saves back into the IFC (name, type, tag, description, property sets). The others can view; added data (Smart Properties, Trimble property sets) stays in their software, not in the IFC."],
+      ["Compare 2 IFCs / show differences","Trimble Connect has 3D Model Comparison (creates a diff model). Solibri has a Model Comparison rule. ifceditor: in development."]
+    ]
+  }
+};
+// y = yes, p = partial, n = no, q = verify, s = coming soon
+const marks = [
+  ["y","y","y","y"],["p","p","p","p"],["y","n","n","n"],["y","n","n","n"],["y","p","p","p"],
+  ["y","p","q","p"],["y","y","y","y"],["y","n","n","n"],["y","y","y","y"],["y","p","p","p"],["s","q","y","y"]
+];
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const icon = k => k === "s" ? '<span class="soon">Coming soon</span>'
+  : `<svg class="ic"><use href="#${{y:"yes",p:"part",n:"no",q:"ask"}[k]}"/></svg>`;
+const cells = (vals, cls) => vals.map((v,i)=>`<div class="c ${cls}${i===0?" me":""}">${v}</div>`).join("");
+
+function setLang(l){
+  const t = T[l];
+  document.documentElement.lang = l;
+  document.title = t.title;
+  document.querySelectorAll("[data-t]").forEach(e => e.textContent = t[e.dataset.t]);
+  document.getElementById("head").innerHTML = "<div></div>" + t.heads.map(([b,e,p,s],i)=>`
+    <div class="col${i===0?" me":""}"><div class="brand">${b}</div><div class="ed">${e}</div>
+    <span class="pill${i===0?" free":""}">${p}</span><div class="sub">${s}</div></div>`).join("");
+  document.getElementById("cost").innerHTML =
+    t.cost.map(([n,v])=>`<div class="grid row"><div class="label">${n}</div>${cells(v,"txt")}</div>`).join("") +
+    `<div class="grid row"><div class="label">${t.costYear}</div>${cells(t.costVals,"money")}</div>`;
+  document.getElementById("features").innerHTML = t.feats.map(([n,note],r)=>`
+    <div class="grid row"><div class="label">${esc(n)}<span class="info" tabindex="0">i<span class="tip">${esc(note)}</span></span></div>
+    ${marks[r].map((k,i)=>`<div class="c${i===0?" me":""}">${icon(k)}</div>`).join("")}</div>`).join("");
+  document.getElementById("btn-vi").classList.toggle("on", l==="vi");
+  document.getElementById("btn-en").classList.toggle("on", l==="en");
+  try{ localStorage.setItem("ifcCompareLang", l); }catch(e){}
+}
+let start = "vi";
+try{ start = localStorage.getItem("ifcCompareLang") || "vi"; }catch(e){}
+// ?lang=vi|en (dùng khi nhúng vào slide trình chiếu) ưu tiên hơn lựa chọn đã lưu
+const urlLang = new URLSearchParams(location.search).get("lang");
+if (urlLang === "vi" || urlLang === "en") start = urlLang;
+setLang(start);
+</script>
+</body>
+</html>

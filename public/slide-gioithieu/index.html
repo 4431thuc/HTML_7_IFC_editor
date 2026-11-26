@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="vi" data-lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IFC Rebar BIM Editor – Giới thiệu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#16213a; --line:#24314d;
+    --ink:#e7edf7; --muted:#93a1ba; --dim:#64748b;
+    --blue:#3b82f6; --green:#10b981; --amber:#f59e0b; --red:#ef4444; --pink:#d946ef; --cyan:#22d3ee;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#05080f;color:var(--ink);overflow:hidden;
+    font-family:Inter,"Segoe UI",Arial,sans-serif}
+  html[data-lang=vi] .en, html[data-lang=en] .vi{display:none !important}
+
+  /* Sân khấu 1920×1080, co giãn vừa cửa sổ */
+  #stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center center;background:var(--bg);overflow:hidden}
+  .slide{position:absolute;inset:0;padding:96px 120px 110px;opacity:0;visibility:hidden;transition:opacity .45s ease, visibility .45s;
+    background:radial-gradient(1200px 700px at 85% -10%, rgba(59,130,246,.16), transparent 60%),
+               radial-gradient(900px 600px at -10% 110%, rgba(16,185,129,.12), transparent 60%), var(--bg)}
+  .slide.on{opacity:1;visibility:visible}
+  .slide .in{opacity:0;transform:translateY(24px);transition:opacity .6s ease, transform .6s ease}
+  .slide.on .in{opacity:1;transform:none}
+  .slide.on .d1{transition-delay:.12s}.slide.on .d2{transition-delay:.24s}.slide.on .d3{transition-delay:.36s}
+  .slide.on .d4{transition-delay:.48s}.slide.on .d5{transition-delay:.6s}.slide.on .d6{transition-delay:.72s}
+
+  .eyebrow{font-size:22px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--green)}
+  h1{font-size:96px;line-height:1.02;margin:18px 0 0;font-weight:900;letter-spacing:-.02em}
+  h2{font-size:60px;line-height:1.1;margin:10px 0 0;font-weight:800;letter-spacing:-.01em}
+  .lead{font-size:30px;line-height:1.45;color:#c9d4e6;margin-top:28px;max-width:1100px}
+  .muted{color:var(--muted)}
+  .foot{position:absolute;left:120px;right:120px;bottom:44px;font-size:18px;color:var(--dim)}
+  .hl-blue{color:#7fb0ff}.hl-green{color:#4ade80}.hl-amber{color:#fbbf24}.hl-red{color:#f87171}
+
+  /* Khung ảnh chụp màn hình */
+  .shot{border-radius:18px;overflow:hidden;border:1px solid #2b3a5c;box-shadow:0 30px 80px rgba(0,0,0,.55);background:#0e1626}
+  .shot img{display:block;width:100%;height:100%;object-fit:cover}
+  .cap{font-size:20px;color:var(--muted);margin-top:12px}
+
+  /* Thẻ */
+  .card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:20px;padding:30px 32px}
+  .stat b{display:block;font-size:76px;line-height:1;font-weight:900;letter-spacing:-.02em}
+  .stat span{display:block;font-size:22px;color:#c9d4e6;margin-top:10px;line-height:1.35}
+  .stat small{display:block;font-size:18px;color:var(--muted);margin-top:6px}
+
+  ul.ticks{list-style:none;padding:0;margin:34px 0 0}
+  ul.ticks li{position:relative;padding-left:52px;font-size:30px;line-height:1.35;margin:0 0 22px;color:#dbe4f2}
+  ul.ticks li::before{content:"";position:absolute;left:0;top:6px;width:30px;height:30px;border-radius:50%;
+    background:rgba(16,185,129,.16) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.5 12.5l3.5 3.5 7.5-8' fill='none' stroke='%2334d399' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/22px no-repeat;
+    border:1.5px solid rgba(52,211,153,.6)}
+  ul.ticks li em{font-style:normal;color:var(--muted);font-size:24px}
+
+  .chip{display:inline-flex;align-items:center;gap:12px;padding:14px 22px;border-radius:999px;font-size:24px;font-weight:600;
+    background:rgba(239,68,68,.12);border:1.5px solid rgba(239,68,68,.45);color:#fecaca}
+  .chip i{font-style:normal;font-weight:900;color:#f87171}
+  .url{display:inline-block;margin-top:44px;padding:14px 26px;border-radius:14px;background:rgba(59,130,246,.15);
+    border:1.5px solid rgba(59,130,246,.5);font-size:28px;font-weight:700;color:#bfdbfe;letter-spacing:.01em}
+
+  /* Slide 1 */
+  .s-title{padding:0}
+  .s-title .bgimg{position:absolute;inset:0;background:url(../gioithieu-img/01-tong-quan.jpg) 520px -48px/1900px auto no-repeat #f1f5f9;filter:saturate(1.1)}
+  .s-title .veil{position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,13,25,.97) 0%,rgba(8,13,25,.9) 42%,rgba(8,13,25,.35) 75%,rgba(8,13,25,.15) 100%)}
+  .s-title .content{position:absolute;left:120px;top:210px;width:1000px}
+  .logo{width:96px;height:96px;border-radius:24px;background:linear-gradient(135deg,#22d3ee,#3b82f6 60%,#6366f1);display:grid;place-items:center;
+    box-shadow:0 20px 50px rgba(59,130,246,.4);margin-bottom:34px}
+
+  /* Slide 2: giá */
+  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:34px;margin-top:56px}
+  .price .brand{font-size:22px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .price .name{font-size:36px;font-weight:800;margin-top:6px}
+  .price .amt{font-size:64px;font-weight:900;margin-top:26px;color:#fbbf24;letter-spacing:-.02em}
+  .price .per{font-size:22px;color:var(--muted);margin-top:6px}
+  .price .note{font-size:20px;color:#c9d4e6;margin-top:22px;border-top:1px solid var(--line);padding-top:18px;line-height:1.45}
+  .nochips{display:flex;gap:20px;flex-wrap:wrap;margin-top:56px}
+
+  /* Lưới 2 cột */
+  .two{display:grid;grid-template-columns:1.55fr 1fr;gap:56px;align-items:start;margin-top:46px}
+  .stack{display:flex;flex-direction:column;gap:24px}
+
+  /* Slide 6: 3 ảnh */
+  .tri{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:46px}
+  .tri > div{min-width:0}
+  .tri .shot{height:300px}
+  .shot img.crop{height:auto;max-width:none;object-fit:initial}
+  .tri .cap b{color:var(--ink);font-size:24px;display:block;margin-bottom:4px}
+  .strip{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:40px}
+
+  /* Slide 7: nhúng bảng so sánh */
+  .s-cmp{padding:84px 100px 80px}
+  .cmp-top{display:flex;justify-content:space-between;align-items:flex-end;gap:30px}
+  .cmp-title{font-size:44px;font-weight:800;margin:8px 0 0;letter-spacing:-.01em}
+  .cmp-sub{font-size:19px;color:var(--muted);margin:6px 0 0}
+  .cmp-legend{display:flex;gap:20px;font-size:17px;color:#c9d4e6;align-items:center;flex:none}
+  .cmp-legend span{display:flex;align-items:center;gap:7px}
+  .cmp{margin-top:18px}
+  .cgrid{display:grid;grid-template-columns:1.6fr repeat(4,1fr);align-items:center}
+  .chead{padding:6px 0 10px;border-bottom:1px solid var(--line)}
+  .chead .col{text-align:center;padding:10px 6px 8px}
+  .chead .me{background:rgba(59,130,246,.12);border-radius:14px 14px 0 0}
+  .cbrand{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .ced{font-size:21px;font-weight:800;margin:2px 0 8px;text-transform:uppercase}
+  .chead .me .ced{color:#7fb0ff}
+  .cpill{display:inline-block;border:1.5px solid #64748b;border-radius:999px;padding:3px 14px;font-size:14px;letter-spacing:.06em;
+    font-weight:700;color:#fbbf24;white-space:nowrap;text-transform:uppercase}
+  .cpill.free{border-color:#34d399;color:#6ee7b7}
+  .csub{font-size:14px;color:var(--muted);margin-top:6px}
+  .csec{font-size:17px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--green);padding:12px 0 6px;border-bottom:1px solid var(--line)}
+  .crow{height:40px;border-bottom:1px solid rgba(36,49,77,.75)}
+  .crow > div{height:100%;display:flex;align-items:center;padding:0 10px}
+  .crow .c{justify-content:center;text-align:center}
+  .crow .me{background:rgba(59,130,246,.12)}
+  .clabel{gap:10px;font-size:19px;color:#dbe4f2}
+  .ctxt{font-size:15.5px;color:#c9d4e6;line-height:1.2}
+  .cmoney{font-size:20px;font-weight:800;color:#fbbf24;gap:8px}
+  .cmoney small{font-size:14px;color:var(--muted);font-weight:500}
+  .crow .me.cmoney{color:#6ee7b7}
+  .cic{width:28px;height:28px}
+  .csoon{display:inline-block;background:rgba(59,130,246,.2);color:#93c5fd;border-radius:999px;padding:3px 12px;font-size:15px;font-weight:700;white-space:nowrap}
+  .info{position:relative;flex:none;width:21px;height:21px;border:1.5px solid #94a3b8;border-radius:50%;
+    font:italic 700 12px/18px Georgia,serif;text-align:center;color:#94a3b8;cursor:help}
+  .info .tip{display:none;position:absolute;left:32px;top:50%;transform:translateY(-50%);width:540px;background:#0b1220;border:1px solid #3b4a68;
+    color:#e7edf7;font:16px/1.5 Inter,"Segoe UI",Arial,sans-serif;font-style:normal;text-align:left;padding:12px 16px;border-radius:10px;z-index:9;
+    box-shadow:0 12px 40px rgba(0,0,0,.6)}
+  .info:hover .tip,.info:focus .tip{display:block}
+  .s-cmp .foot{bottom:22px}
+
+  /* Slide 8: con số */
+  .bignums{display:grid;grid-template-columns:repeat(3,1fr);gap:34px;margin-top:60px}
+  .bignum{text-align:center;padding:46px 26px}
+  .bignum b{display:block;font-size:150px;line-height:1;font-weight:900;letter-spacing:-.04em;
+    background:linear-gradient(180deg,#fff,#9cc3ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .bignum span{display:block;font-size:30px;font-weight:700;margin-top:18px}
+  .bignum small{display:block;font-size:21px;color:var(--muted);margin-top:10px;line-height:1.4}
+  .ifrent{margin-top:40px;font-size:24px;color:#c9d4e6;line-height:1.6}
+  .ifrent b{color:#fbbf24}
+
+  /* Slide 9 */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:50px}
+  .cols h3{font-size:30px;margin:0 0 6px;font-weight:800}
+  ol.road{margin:22px 0 0;padding:0;list-style:none;counter-reset:r}
+  ol.road li{counter-increment:r;position:relative;padding-left:62px;font-size:27px;line-height:1.4;margin-bottom:20px;color:#dbe4f2}
+  ol.road li::before{content:counter(r);position:absolute;left:0;top:0;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+    font-size:21px;font-weight:800;background:rgba(59,130,246,.18);color:#93c5fd;border:1px solid rgba(59,130,246,.45)}
+  .ask ol.road li::before{background:rgba(16,185,129,.16);color:#6ee7b7;border-color:rgba(16,185,129,.45)}
+  .tag{display:inline-block;font-size:17px;font-weight:700;padding:3px 10px;border-radius:999px;background:#1e3a8a;color:#bfdbfe;margin-left:8px;vertical-align:3px}
+
+  /* Thanh điều khiển ngoài sân khấu */
+  #ui{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:12px;padding:10px 16px;
+    background:linear-gradient(0deg,rgba(0,0,0,.65),transparent);opacity:0;transition:opacity .3s;z-index:10}
+  body:hover #ui, #ui:focus-within{opacity:1}
+  #ui button{border:1px solid #3b4a68;background:#111a2e;color:#e7edf7;border-radius:10px;padding:8px 14px;font:600 14px Inter,"Segoe UI",sans-serif;cursor:pointer}
+  #ui button:hover{background:#1b2742}
+  #ui .on{background:#2563eb;border-color:#2563eb}
+  #ui .sp{flex:1}
+  #ui .num{font:600 14px Inter,sans-serif;color:#cbd5e1;min-width:64px;text-align:center}
+  .lang{display:flex}
+  .lang button:first-child{border-radius:10px 0 0 10px}.lang button:last-child{border-radius:0 10px 10px 0;margin-left:-1px}
+  #bar{position:fixed;left:0;top:0;height:4px;background:linear-gradient(90deg,#22d3ee,#3b82f6);transition:width .4s;z-index:11}
+  .pageno{position:absolute;right:120px;bottom:44px;font-size:18px;color:var(--dim);font-weight:600;letter-spacing:.08em}
+  .brandtag{position:absolute;left:120px;top:44px;font-size:18px;color:var(--dim);font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="c-yes" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#60a5fa" stroke-width="1.6"/><path d="M7.3 12.4l3.1 3.1 6.3-6.6" fill="none" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="c-part" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#fbbf24" stroke-width="1.6"/><path d="M12 1.5a10.5 10.5 0 0 1 0 21z" fill="#fbbf24"/></symbol>
+    <symbol id="c-no" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#f87171" stroke-width="1.6"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" stroke="#f87171" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="c-ask" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#94a3b8" stroke-width="1.6" stroke-dasharray="3 2.4"/><text x="12" y="16.5" text-anchor="middle" font-size="13" font-family="Arial" font-weight="700" fill="#94a3b8">?</text></symbol>
+  </defs>
+</svg>
+<div id="bar"></div>
+<div id="stage">
+
+  <!-- 1. Tiêu đề -->
+  <section class="slide s-title">
+    <div class="bgimg"></div><div class="veil"></div>
+    <div class="content">
+      <div class="logo in"><svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2.5l8.5 4.8v9.4L12 21.5l-8.5-4.8V7.3z"/><path d="M3.8 7.4L12 12l8.2-4.6M12 12v9.3"/></svg></div>
+      <div class="eyebrow in d1">MACZT + MACeng · 2026</div>
+      <h1 class="in d2">IFC Rebar<br>BIM Editor</h1>
+      <p class="lead in d3"><span class="vi">Công cụ BIM do chính chúng ta làm ra: xem, kiểm tra và chỉnh sửa mô hình IFC cốt thép ngay trên trình duyệt.</span><span class="en">A BIM tool built in-house: view, check and edit rebar IFC models right in the browser.</span></p>
+      <div class="url in d4">ifceditor.macztasia.com</div>
+    </div>
+  </section>
+
+  <!-- 2. Vấn đề -->
+  <section class="slide">
+    <div class="eyebrow in"><span class="vi">Vấn đề</span><span class="en">The problem</span></div>
+    <h2 class="in d1"><span class="vi">Phần mềm IFC trả phí: đắt, và chủ yếu chỉ để xem</span><span class="en">Paid IFC software: expensive, and mostly view-only</span></h2>
+    <div class="prices">
+      <div class="card price in d2"><div class="brand">BIMcollab</div><div class="name">Zoom</div><div class="amt">€720</div>
+        <div class="per"><span class="vi">/ người / năm</span><span class="en">/ user / year</span></div>
+        <div class="note"><span class="vi">Chỉ thuê theo tháng/năm · license floating €900/năm</span><span class="en">Subscription only · floating license €900/yr</span></div></div>
+      <div class="card price in d3"><div class="brand">Trimble Connect</div><div class="name">Pro · Innovate</div><div class="amt">$349–499</div>
+        <div class="per"><span class="vi">/ người / năm</span><span class="en">/ user / year</span></div>
+        <div class="note"><span class="vi">Thuê theo user · Enterprise báo giá riêng</span><span class="en">Per user · Enterprise on quote</span></div></div>
+      <div class="card price in d4"><div class="brand">Solibri</div><div class="name">Essential · Advanced</div><div class="amt">€1.428–2.109</div>
+        <div class="per"><span class="vi">/ license / năm</span><span class="en">/ license / year</span></div>
+        <div class="note"><span class="vi">Chỉ thuê, không bán vĩnh viễn · Premium €2.772</span><span class="en">Subscription only, no perpetual · Premium €2,772</span></div></div>
+    </div>
+    <div class="nochips in d5">
+      <div class="chip"><i>✕</i><span class="vi">Không xóa đối tượng khỏi file IFC</span><span class="en">Cannot remove objects from the IFC</span></div>
+      <div class="chip"><i>✕</i><span class="vi">Không gộp nhiều IFC thành 1 file</span><span class="en">Cannot merge IFCs into one file</span></div>
+      <div class="chip"><i>✕</i><span class="vi">Không sửa thuộc tính rồi lưu vào IFC</span><span class="en">Cannot edit properties and save to IFC</span></div>
+    </div>
+    <div class="foot"><span class="vi">Giá tra cứu 11/2026 trên trang chính hãng, chưa gồm VAT, có thể khác theo khu vực/đại lý.</span><span class="en">Prices checked Nov 2026 on vendors' official sites, excl. VAT; may vary by region/reseller.</span></div>
+  </section>
+
+  <!-- 3. Giải pháp -->
+  <section class="slide">
+    <div class="eyebrow in"><span class="vi">Giải pháp</span><span class="en">The solution</span></div>
+    <h2 class="in d1"><span class="vi">Mở trình duyệt là dùng được</span><span class="en">Open a browser and go</span></h2>
+    <div class="two">
+      <div class="in d2">
+        <div class="shot" style="height:520px"><img src="../gioithieu-img/02-cropbox-xray.jpg" alt=""></div>
+        <div class="cap"><span class="vi">CropBox 6 mặt + soi thép X-Ray</span><span class="en">6-face CropBox + X-Ray rebar view</span></div>
+      </div>
+      <ul class="ticks in d3" style="margin-top:0">
+        <li><span class="vi">Chạy trên web, <b>không cần cài đặt</b></span><span class="en">Runs on the web, <b>no installation</b></span></li>
+        <li><span class="vi">File IFC xử lý ngay trên máy, <b>không tải lên server</b></span><span class="en">IFC files are processed locally, <b>never uploaded</b></span></li>
+        <li><span class="vi">Mở nhiều file cùng lúc, nhóm và tô màu theo Pos thép, Name, Type</span><span class="en">Open many files at once, group and colour by bar mark, Name, Type</span></li>
+        <li><span class="vi">Đo đạc bắt điểm cạnh, góc, vuông góc <em>(tọa độ dự án)</em></span><span class="en">Measuring with edge, corner and perpendicular snaps <em>(project coordinates)</em></span></li>
+        <li><span class="vi">Giao diện Việt / Anh</span><span class="en">Vietnamese / English interface</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 4. Liên kết thép -->
+  <section class="slide">
+    <div class="eyebrow in"><span class="vi">Điểm khác biệt</span><span class="en">What sets it apart</span></div>
+    <h2 class="in d1"><span class="vi">Hiểu coupler và đầu ren như kỹ sư thép</span><span class="en">Understands couplers and threaded ends like a rebar engineer</span></h2>
+    <div class="two">
+      <div class="in d2">
+        <div class="shot" style="height:560px"><img src="../gioithieu-img/03-lien-ket-thep.jpg" alt=""></div>
+        <div class="cap"><span class="vi">Chọn coupler → app chỉ ra 2 thanh thép chủ Ø28 và liên kết cùng mối nối</span><span class="en">Select a coupler → the app shows its two Ø28 host bars and the joint partner</span></div>
+      </div>
+      <div class="stack">
+        <div class="card stat in d3"><b class="hl-green">3.399</b><span class="vi">liên kết thép được nhận diện, không sót thép chủ</span><span class="en">rebar connections detected, every one matched to its host bar</span>
+          <small class="vi">1.705 đầu ren · 1.562 coupler nối · 132 coupler chờ</small><small class="en">1,705 threaded ends · 1,562 couplers · 132 starter couplers</small></div>
+        <div class="card stat in d4"><b class="hl-blue">7.299 → 3.900</b><span class="vi">cấu kiện sau khi tự gộp bản liên kết Allplan xuất trùng</span><span class="en">elements after merging Allplan's duplicated connector exports</span></div>
+        <div class="card in d5" style="font-size:22px;line-height:1.5;color:#c9d4e6"><span class="vi">IFC từ Allplan <b>không có quan hệ nối</b> giữa liên kết và thanh thép: app nhận diện <b>thuần bằng hình học</b>.</span><span class="en">Allplan IFC has <b>no connection relationships</b> between connectors and bars: the app detects them <b>purely from geometry</b>.</span></div>
+      </div>
+    </div>
+    <div class="foot"><span class="vi">Số liệu trên mô hình mẫu 32R-08290-BW31-P1.</span><span class="en">Figures from sample model 32R-08290-BW31-P1.</span></div>
+  </section>
+
+  <!-- 5. Clash -->
+  <section class="slide">
+    <div class="eyebrow in"><span class="vi">Kiểm tra va chạm</span><span class="en">Clash detection</span></div>
+    <h2 class="in d1"><span class="vi">Chỉ báo va chạm thật, không báo nhiễu</span><span class="en">Only real clashes, no noise</span></h2>
+    <div class="two">
+      <div class="in d2">
+        <div class="shot" style="height:560px"><img src="../gioithieu-img/04-clash-chi-tiet.jpg" alt=""></div>
+        <div class="cap"><span class="vi">Mỗi va chạm ghi Pos + Ø của 2 thanh, bấm là zoom tới đúng chỗ</span><span class="en">Each clash names both bars by mark + Ø; click to zoom straight to it</span></div>
+      </div>
+      <div class="stack">
+        <div class="card stat in d3"><b class="hl-amber">13.145</b><span class="vi">cặp liên kết ↔ thép chủ được tự bỏ qua</span><span class="en">connector ↔ host-bar pairs skipped automatically</span>
+          <small class="vi">Phần mềm thông thường sẽ báo hết là va chạm</small><small class="en">Generic tools would report every one as a clash</small></div>
+        <div class="card stat in d4"><b class="hl-red">1.445</b><span class="vi">va chạm thật còn lại, xếp theo thể tích giao</span><span class="en">real clashes left, ranked by overlap volume</span></div>
+        <div class="card stat in d5"><b style="font-size:56px">~1 <span class="vi" style="display:inline;font-size:40px;color:inherit;margin:0">phút</span><span class="en" style="display:inline;font-size:40px;color:inherit;margin:0">min</span></b><span class="vi">cho 3.900 cấu kiện, ngay trên trình duyệt</span><span class="en">for 3,900 elements, right in the browser</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Sửa và lưu -->
+  <section class="slide">
+    <div class="eyebrow in"><span class="vi">Không chỉ xem</span><span class="en">More than a viewer</span></div>
+    <h2 class="in d1"><span class="vi">Sửa, dịch chuyển, chia tách và lưu lại thành IFC</span><span class="en">Edit, move, split and save back to IFC</span></h2>
+    <div class="tri">
+      <div class="in d2"><div class="shot"><img src="../gioithieu-img/07-sua-pset.jpg" alt="" class="crop" style="width:1364px;margin:-233px 0 0 -412px"></div>
+        <div class="cap"><b class="vi">Sửa thuộc tính &amp; Pset</b><b class="en">Edit attributes &amp; Psets</b><span class="vi">Áp cho nhiều cấu kiện, ghi vào IFC</span><span class="en">Apply to many elements, written to IFC</span></div></div>
+      <div class="in d3"><div class="shot"><img src="../gioithieu-img/08-dich-chuyen.jpg" alt="" class="crop" style="width:1364px;margin:-110px 0 0 0"></div>
+        <div class="cap"><b class="vi">Dịch chuyển / xoay dự án</b><b class="en">Move / rotate project</b><span class="vi">Theo từng file, lưu profile (Allplan → S21)</span><span class="en">Per file, saved profiles (Allplan → S21)</span></div></div>
+      <div class="in d4"><div class="shot"><img src="../gioithieu-img/09-chia-tach.jpg" alt="" class="crop" style="width:1364px;margin:-60px 0 0 0"></div>
+        <div class="cap"><b class="vi">Chia tách &amp; gộp file</b><b class="en">Split &amp; merge files</b><span class="vi">Xuất riêng phần đang hiện, dọn sạch dữ liệu thừa</span><span class="en">Export what is visible, with orphan data cleaned</span></div></div>
+    </div>
+    <div class="strip">
+      <div class="card stat in d5"><b class="hl-green" style="font-size:58px">57 MB → 14 KB</b><span class="vi">tách 15 tường từ file 60.000 tường, khoảng 1,1 giây</span><span class="en">15 walls split from a 60,000-wall file in about 1.1 s</span></div>
+      <div class="card stat in d5"><b class="hl-blue" style="font-size:58px">Ctrl+Z / Y</b><span class="vi">mọi thao tác ghi IFC đều hoàn tác được</span><span class="en">every change written to IFC can be undone</span></div>
+      <div class="card stat in d6"><b class="hl-amber" style="font-size:58px">Header + Project</b><span class="vi">sửa thông tin dự án, công trình, tầng, địa chỉ rồi lưu vào IFC</span><span class="en">edit project, site, building, storey and address info, saved to IFC</span></div>
+    </div>
+  </section>
+
+  <!-- 7. So sánh -->
+  <section class="slide s-cmp">
+    <div class="cmp-top in">
+      <div>
+        <div class="eyebrow"><span class="vi">So sánh</span><span class="en">Comparison</span></div>
+        <div class="cmp-title" data-c="title"></div>
+        <p class="cmp-sub" data-c="subtitle"></p>
+      </div>
+      <div class="cmp-legend">
+        <span><svg class="cic"><use href="#c-yes"/></svg><b data-c="lgYes"></b></span>
+        <span><svg class="cic"><use href="#c-part"/></svg><b data-c="lgPart"></b></span>
+        <span><svg class="cic"><use href="#c-no"/></svg><b data-c="lgNo"></b></span>
+        <span><svg class="cic"><use href="#c-ask"/></svg><b data-c="lgAsk"></b></span>
+        <span class="csoon">Coming soon</span>
+      </div>
+    </div>
+    <div class="cmp in d1">
+      <div class="cgrid chead" id="cmpHead"></div>
+      <div class="csec" data-c="secCost"></div>
+      <div id="cmpCost"></div>
+      <div class="csec" data-c="secFeat"></div>
+      <div id="cmpFeat"></div>
+    </div>
+    <div class="foot" data-c="foot"></div>
+  </section>
+
+  <!-- 8. Chi phí -->
+  <section class="slide">
+    <div class="eyebrow in"><span class="vi">Chi phí</span><span class="en">Cost</span></div>
+    <h2 class="in d1"><span class="vi">Tự làm được, và gần như không tốn gì</span><span class="en">Built in-house, at almost no cost</span></h2>
+    <div class="bignums">
+      <div class="card bignum in d2"><b>0 €</b><span class="vi">phí license</span><span class="en">license fees</span>
+        <small class="vi">cho MACZT + MACeng, không giới hạn người dùng</small><small class="en">for MACZT + MACeng, unlimited users</small></div>
+      <div class="card bignum in d3"><b>1</b><span class="vi">người phát triển</span><span class="en">developer</span>
+        <small>thuc.hoang</small></div>
+      <div class="card bignum in d4"><b>1</b><span class="vi">tháng</span><span class="en">month</span></div>
+    </div>
+    <div class="ifrent in d5"><span class="vi">Để so sánh, nếu thuê cho <b>10 người</b> mỗi năm: BIMcollab Zoom <b>€7.200</b> · Trimble Connect <b>$3.490–4.990</b> · Solibri <b>€14.280–21.090</b>.</span><span class="en">For comparison, renting for <b>10 users</b> per year: BIMcollab Zoom <b>€7,200</b> · Trimble Connect <b>$3,490–4,990</b> · Solibri <b>€14,280–21,090</b>.</span></div>
+  </section>
+
+  <!-- 9. Lộ trình & đề xuất -->
+  <section class="slide">
+    <div class="eyebrow in"><span class="vi">Bước tiếp theo</span><span class="en">Next steps</span></div>
+    <h2 class="in d1"><span class="vi">Lộ trình và đề xuất</span><span class="en">Roadmap and proposal</span></h2>
+    <div class="cols">
+      <div class="card in d2">
+        <h3 class="hl-blue"><span class="vi">Lộ trình phát triển</span><span class="en">Roadmap</span></h3>
+        <ol class="road">
+          <li><span class="vi">So sánh 2 file IFC, hiện khác biệt</span><span class="en">Compare 2 IFC files, show differences</span><span class="tag vi">đang làm</span><span class="tag en">in progress</span></li>
+          <li><span class="vi">Bảng thống kê thép (BBS) xuất Excel</span><span class="en">Bar bending schedule (BBS) export to Excel</span></li>
+          <li><span class="vi">Tour hướng dẫn từng chức năng trong app</span><span class="en">In-app guided tour of every feature</span></li>
+          <li><span class="vi">Đọc / sửa Pset gắn qua kiểu cấu kiện</span><span class="en">Read / edit Psets attached via element types</span></li>
+          <li><span class="vi">Xoay CropBox theo hướng bất kỳ</span><span class="en">Rotatable CropBox</span></li>
+        </ol>
+      </div>
+      <div class="card ask in d3">
+        <h3 class="hl-green"><span class="vi">Đề xuất</span><span class="en">Proposal</span></h3>
+        <ol class="road">
+          <li><span class="vi">Dùng thử chính thức trên 1–2 dự án thật</span><span class="en">Official pilot on 1–2 live projects</span></li>
+          <li><span class="vi">Kỹ sư thép / BIM góp ý trực tiếp để ưu tiên chức năng</span><span class="en">Rebar / BIM engineers feed back to set priorities</span></li>
+          <li><span class="vi">Dành thời gian chính thức để phát triển và bảo trì</span><span class="en">Allocate official time for development and maintenance</span></li>
+          <li><span class="vi">Mở rộng thành bộ công cụ BIM nội bộ của công ty</span><span class="en">Grow it into the company's in-house BIM toolkit</span></li>
+        </ol>
+      </div>
+    </div>
+    <div class="url in d4" style="margin-top:36px">ifceditor.macztasia.com</div>
+  </section>
+
+</div>
+
+<div id="ui">
+  <button id="prev" title="←">◀</button>
+  <span class="num" id="num">1 / 9</span>
+  <button id="next" title="→">▶</button>
+  <span class="sp"></span>
+  <div class="lang"><button id="lvi">VI</button><button id="len">EN</button></div>
+  <a href="../video-gioithieu/" style="text-decoration:none"><button>▶ Video</button></a>
+  <button id="fs" title="F"><span class="vi">Toàn màn hình</span><span class="en">Fullscreen</span></button>
+</div>
+
+<script>
+const stage = document.getElementById('stage');
+const slides = [...document.querySelectorAll('.slide')];
+const brand = 'IFC Rebar BIM Editor';
+slides.forEach((s, i) => {
+  if (i > 0) {
+    s.insertAdjacentHTML('beforeend', `<div class="brandtag">${brand}</div><div class="pageno">${String(i + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}</div>`);
+  }
+});
+
+// Co giãn sân khấu 1920×1080 vừa cửa sổ
+const fit = () => {
+  const k = Math.min(innerWidth / 1920, innerHeight / 1080);
+  stage.style.transform = `translate(-50%,-50%) scale(${k})`;
+};
+addEventListener('resize', fit); fit();
+
+let cur = 0;
+let lang = 'vi';
+try { lang = localStorage.getItem('ifcDeckLang') || 'vi'; } catch (e) {}
+const fromHash = parseInt(location.hash.slice(1), 10);
+if (fromHash >= 1 && fromHash <= slides.length) cur = fromHash - 1;
+
+// ---- Bảng so sánh (slide 7): dữ liệu và cách trình bày lấy từ so-sanh-ifc-viewer.html, không còn phụ thuộc file đó ----
+const CMP = {
+  vi: {
+    title: "So sánh chức năng IFC Viewer",
+    subtitle: "ifceditor.macztasia.com so với bản thuê có phí của BIMcollab Zoom, Trimble Connect và Solibri",
+    lgYes: "Có", lgPart: "Một phần", lgNo: "Không", lgAsk: "Cần kiểm tra",
+    secCost: "Chi phí", secFeat: "Chức năng",
+    foot: "Giá tra cứu 11/2026 trên trang chính hãng, chưa gồm VAT, có thể khác theo khu vực/đại lý. Rê chuột vào biểu tượng i để xem ghi chú.",
+    year: "năm", free: "Miễn phí",
+    heads: [
+      ["IFC Editor","macztasia","Miễn phí","Web, không cần cài đặt"],
+      ["BIMcollab","Zoom","€720 / năm","License đơn · floating €900/năm"],
+      ["Trimble Connect","Pro · Innovate","$349 – $499 / năm","Mỗi user · Enterprise báo giá"],
+      ["Solibri","Essential · Advanced","€1.428 – €2.109 / năm","Mỗi license · Premium €2.772"]
+    ],
+    cost: [
+      ["Nền tảng", ["Web","Desktop Windows","Web + Desktop + Mobile","Desktop"]],
+      ["Hình thức", ["Không tốn phí license cho MACZT + MACeng","Chỉ thuê theo tháng/năm","Thuê theo user/năm","Chỉ thuê, không bán vĩnh viễn"]]
+    ],
+    costYear: "Chi phí 1 người / năm",
+    costVals: ["0","€720","$349 <small>· Innovate $499</small>","€1.428 <small>· Advanced €2.109</small>"],
+    feats: [
+      ["Viewer model + CropBox + hide/show","Cả 4 đều có hộp cắt (section/clipping box) và ẩn/hiện đối tượng."],
+      ["Explorer cây đối tượng / chuyên cho thép","ifceditor: chưa có cây phân cấp đầy đủ (chỉ nhóm theo Pos/tên/type), nhưng là bên duy nhất có bảng thống kê thép theo Pos + đường kính (số lượng, chiều dài, khối lượng), xuất CSV/Excel. 3 phần mềm kia có cây model nhưng không có explorer riêng cho thép."],
+      ["Remove đối tượng khỏi IFC","BIMcollab, Trimble, Solibri chỉ ẩn đối tượng khi xem, không ghi lại thành file IFC."],
+      ["Xuất riêng 1 nhóm đối tượng thành 1 IFC","ifceditor xuất các đối tượng đang hiển thị thành một file IFC mới."],
+      ["Combine nhiều IFC thành 1 và lưu lại","Các phần mềm kia gộp model để xem chung (BIMcollab lưu thành file dự án .bcp), không xuất ra một file IFC duy nhất."],
+      ["Move, rotate dự án IFC và lưu lại","ifceditor: xoay quanh trục Z + tịnh tiến, lưu profile JSON, có undo. BIMcollab Zoom và Solibri có move/rotate để căn chỉnh khi xem, không ghi vào IFC (Solibri khuyến cáo không nên dùng). Trimble: chưa xác minh được."],
+      ["Check clash va chạm","ifceditor: giữa 2 loại đối tượng, có dung sai, xếp theo thể tích va chạm. BIMcollab Zoom cần license trả phí; Solibri từ gói Essential."],
+      ["Nhận diện coupler / đầu ren và thép chủ","ifceditor nhận diện liên kết thép (coupler, đầu ren, TTP...) thuần bằng hình học vì IFC Allplan không có quan hệ nối, tìm thép chủ đi qua liên kết; gộp bản liên kết Allplan xuất trùng; clash tự bỏ qua cặp liên kết ↔ thép chủ nên chỉ còn va chạm thật. File mẫu: 1705 đầu ren + 1562 coupler tìm đủ thép chủ, 3399 bản trùng được gộp. 3 phần mềm kia chỉ xem liên kết như một đối tượng thường."],
+      ["Hệ thống đo đạc trong model","ifceditor: đo khoảng cách 2 điểm, bắt cạnh, lưu danh sách phép đo."],
+      ["Show và edit attribute","Chỉ ifceditor sửa và lưu ngược vào IFC (tên, type, tag, mô tả, property set). Các phần mềm kia xem được; thuộc tính thêm (Smart Properties, property set của Trimble) nằm trong phần mềm, không ghi vào IFC."],
+      ["Compare 2 IFC / show difference","Trimble Connect có 3D Model Comparison (tạo model hiển thị khác biệt). Solibri có rule Model Comparison. ifceditor: đang phát triển."]
+    ]
+  },
+  en: {
+    title: "IFC Viewer Feature Comparison",
+    subtitle: "ifceditor.macztasia.com vs. the paid subscriptions of BIMcollab Zoom, Trimble Connect and Solibri",
+    lgYes: "Yes", lgPart: "Partial", lgNo: "No", lgAsk: "To be verified",
+    secCost: "Cost", secFeat: "Features",
+    foot: "Prices checked Nov 2026 on vendors' official sites, excl. VAT; may vary by region/reseller. Hover the i icon for details.",
+    year: "year", free: "Free",
+    heads: [
+      ["IFC Editor","macztasia","Free","Web, no installation"],
+      ["BIMcollab","Zoom","€720 / year","Single license · floating €900/yr"],
+      ["Trimble Connect","Pro · Innovate","$349 – $499 / year","Per user · Enterprise on quote"],
+      ["Solibri","Essential · Advanced","€1,428 – €2,109 / year","Per license · Premium €2,772"]
+    ],
+    cost: [
+      ["Platform", ["Web","Windows desktop","Web + Desktop + Mobile","Desktop"]],
+      ["Licensing", ["No license fees for MACZT + MACeng","Subscription only (monthly/yearly)","Per user per year","Subscription only, no perpetual"]]
+    ],
+    costYear: "Cost per user / year",
+    costVals: ["0","€720","$349 <small>· Innovate $499</small>","€1,428 <small>· Advanced €2,109</small>"],
+    feats: [
+      ["Model viewer + CropBox + hide/show","All four offer a section/clipping box and hide/show of objects."],
+      ["Object tree explorer / rebar-specific explorer","ifceditor: no full hierarchical tree yet (groups by Pos/name/type), but it is the only one with a rebar schedule by Pos + diameter (count, length, weight), exportable to CSV/Excel. The other three have a model tree but no rebar-specific explorer."],
+      ["Remove objects from IFC","BIMcollab, Trimble and Solibri only hide objects while viewing; nothing is written back to an IFC file."],
+      ["Export a group of objects as a new IFC","ifceditor exports the currently visible objects into a new IFC file."],
+      ["Combine multiple IFCs into one and save","The others federate models for viewing (BIMcollab saves a .bcp project file) but do not write a single merged IFC."],
+      ["Move / rotate IFC project and save","ifceditor: rotate about Z + translate, JSON transform profiles, undo. BIMcollab Zoom and Solibri can move/rotate for alignment while viewing, not written to IFC (Solibri advises against it). Trimble: not verified."],
+      ["Clash detection","ifceditor: between two element types, with tolerance, ranked by overlap volume. BIMcollab Zoom needs a paid license; Solibri from Essential."],
+      ["Coupler / threaded-end detection with host bars","ifceditor detects rebar connections (couplers, threaded ends, TTP...) purely from geometry, since Allplan IFC has no connection relationships, and finds the host bars passing through them; merges Allplan's duplicated connector exports; clash detection skips connector ↔ host-bar pairs so only real clashes remain. Sample model: 1705 threaded ends + 1562 couplers all matched to host bars, 3399 duplicates merged. The other three treat connectors as ordinary objects."],
+      ["Measurement tools","ifceditor: point-to-point distance with edge snapping and a saved measurement list."],
+      ["Show and edit attributes","Only ifceditor edits and saves back into the IFC (name, type, tag, description, property sets). The others can view; added data (Smart Properties, Trimble property sets) stays in their software, not in the IFC."],
+      ["Compare 2 IFCs / show differences","Trimble Connect has 3D Model Comparison (creates a diff model). Solibri has a Model Comparison rule. ifceditor: in development."]
+    ]
+  }
+};
+
+const CMP_MARKS = [
+  ["y","y","y","y"],["p","p","p","p"],["y","n","n","n"],["y","n","n","n"],["y","p","p","p"],
+  ["y","p","q","p"],["y","y","y","y"],["y","n","n","n"],["y","y","y","y"],["y","p","p","p"],["s","q","y","y"]
+];
+const cmpEsc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const cmpIcon = k => k === 's' ? '<span class="csoon">Coming soon</span>'
+  : `<svg class="cic"><use href="#c-${{ y: 'yes', p: 'part', n: 'no', q: 'ask' }[k]}"/></svg>`;
+const cmpCells = (vals, cls) => vals.map((v, i) => `<div class="c ${cls}${i === 0 ? ' me' : ''}">${v}</div>`).join('');
+const renderCompare = (l) => {
+  const t = CMP[l];
+  document.querySelectorAll('[data-c]').forEach(e => { e.textContent = t[e.dataset.c]; });
+  document.getElementById('cmpHead').innerHTML = '<div></div>' + t.heads.map(([b, e, p, s], i) => `
+    <div class="col${i === 0 ? ' me' : ''}"><div class="cbrand">${b}</div><div class="ced">${e}</div>
+    <span class="cpill${i === 0 ? ' free' : ''}">${p}</span><div class="csub">${s}</div></div>`).join('');
+  document.getElementById('cmpCost').innerHTML =
+    t.cost.map(([n, v]) => `<div class="cgrid crow"><div class="clabel">${n}</div>${cmpCells(v, 'ctxt')}</div>`).join('') +
+    `<div class="cgrid crow"><div class="clabel">${t.costYear}</div>${cmpCells(t.costVals, 'cmoney')}</div>`;
+  document.getElementById('cmpFeat').innerHTML = t.feats.map(([n, note], r) => `
+    <div class="cgrid crow"><div class="clabel">${cmpEsc(n)}<span class="info" tabindex="0">i<span class="tip">${cmpEsc(note)}</span></span></div>
+    ${CMP_MARKS[r].map((k, i) => `<div class="c${i === 0 ? ' me' : ''}">${cmpIcon(k)}</div>`).join('')}</div>`).join('');
+};
+
+const show = (i) => {
+  cur = Math.max(0, Math.min(slides.length - 1, i));
+  slides.forEach((s, k) => s.classList.toggle('on', k === cur));
+  document.getElementById('num').textContent = `${cur + 1} / ${slides.length}`;
+  document.getElementById('bar').style.width = `${(cur + 1) / slides.length * 100}%`;
+  history.replaceState(null, '', '#' + (cur + 1));
+};
+
+const setLang = (l) => {
+  lang = l;
+  document.documentElement.dataset.lang = l;
+  document.documentElement.lang = l;
+  document.getElementById('lvi').classList.toggle('on', l === 'vi');
+  document.getElementById('len').classList.toggle('on', l === 'en');
+  document.title = l === 'vi' ? 'IFC Rebar BIM Editor – Giới thiệu' : 'IFC Rebar BIM Editor – Introduction';
+  try { localStorage.setItem('ifcDeckLang', l); } catch (e) {}
+  renderCompare(l);
+};
+
+document.getElementById('prev').onclick = () => show(cur - 1);
+document.getElementById('next').onclick = () => show(cur + 1);
+document.getElementById('lvi').onclick = () => setLang('vi');
+document.getElementById('len').onclick = () => setLang('en');
+const toggleFs = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
+document.getElementById('fs').onclick = toggleFs;
+
+addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); show(cur + 1); }
+  else if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); show(cur - 1); }
+  else if (e.key === 'Home') show(0);
+  else if (e.key === 'End') show(slides.length - 1);
+  else if (e.key === 'f' || e.key === 'F') toggleFs();
+  else if (e.key === 'l' || e.key === 'L') setLang(lang === 'vi' ? 'en' : 'vi');
+});
+// Click nửa phải/trái sân khấu để chuyển slide (trừ slide có iframe)
+stage.addEventListener('click', (e) => {
+  if (e.target.closest('.info')) return;
+  (e.clientX > innerWidth / 2) ? show(cur + 1) : show(cur - 1);
+});
+
+setLang(lang);
+show(cur);
+</script>
+</body>
+</html>
