@@ -170,7 +170,8 @@ export const restoreMeshMaterial = (mesh) => {
     });
 };
 
-export const applyHoverMaterial = (mesh) => {
+// members: mặc định cả cấu kiện; panel liên kết thép truyền đúng một thanh (một IfcReinforcingBar có thể chứa nhiều thanh)
+export const applyHoverMaterial = (mesh, members = getObjectMeshes(mesh)) => {
     applyModelOpacityToMaterial(hoverMaterial);
     const planes = isCropBoxActive.value ? clippingPlanes : null;
     if (hoverMaterial.clippingPlanes !== planes) {
@@ -178,7 +179,7 @@ export const applyHoverMaterial = (mesh) => {
         hoverMaterial.needsUpdate = true;
     }
     hoverMaterial.wireframe = isWireframe.value;
-    getObjectMeshes(mesh).forEach(member => setElementOverlay(member, hoverMaterial));
+    members.forEach(member => setElementOverlay(member, hoverMaterial));
 };
 
 // Xây lại toàn bộ batch từ các cấu kiện hiện có trong modelGroup (gọi sau khi load/xóa/đổi tập cấu kiện)

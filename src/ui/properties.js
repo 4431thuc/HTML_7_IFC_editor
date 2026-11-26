@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import { toRaw } from 'vue';
 import { getObjectMeshes, getPsetCacheKey } from '../core/helpers.js';
 import { createIfcRecorder, pushHistory } from '../core/history.js';
 import { buildAllGroupingCollections } from '../ifc/groups.js';
-import { attributeBaseline, editableAttributes, hasAttributeChanges, psetCache, rt, selectedMeshes, selectedObject } from '../state/state.js';
+import { attributeBaseline, connectionTarget, editableAttributes, hasAttributeChanges, psetCache, rt, selectedMeshes, selectedObject } from '../state/state.js';
 import { showToast } from './panels.js';
 import { t } from '../i18n/index.js';
 
@@ -17,6 +18,7 @@ export const showPropertiesForMesh = (mesh) => {
         z: size.y.toFixed(3)
     };
 
+    connectionTarget.value = toRaw(mesh);
     const expressID = mesh.userData.expressID;
     const typeName = mesh.userData.type;
     const isRebar = mesh.userData.isRebar;

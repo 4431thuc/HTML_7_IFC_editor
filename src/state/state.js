@@ -201,6 +201,8 @@ export const barScheduleStale = ref(true);
 
 export const selectedMeshes = ref([]);
 export const selectedObject = ref(null);
+// Mesh đang hiện ở panel thuộc tính, để panel tìm liên kết thép ↔ thép chủ (src/ui/connection-info.js)
+export const connectionTarget = shallowRef(null);
 export const isEditingAttributes = ref(false);
 
 // Shift Box Selection

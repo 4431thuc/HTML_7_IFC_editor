@@ -1308,6 +1308,101 @@
                     </div>
                 </div>
 
+                <!-- LIÊN KẾT THÉP (coupler, đầu ren) ↔ THÉP CHỦ: src/ui/connection-info.js -->
+                <template v-for="conn in [selectedConnections]" :key="'connections'"><div v-if="conn"
+                    class="bg-gradient-to-br from-pink-950/30 to-slate-900 border border-pink-500/40 rounded-xl p-3.5 space-y-2.5">
+                    <h4 class="text-xs font-bold text-pink-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="ph-bold ph-link"></i>
+                        <span>{{ conn.role === 'bar' ? t('Liên kết thép của thanh') : (conn.role === 'connector' ? t('Liên kết thép') : t('Nhận diện liên kết thép')) }}</span>
+                        <span v-if="conn.role === 'bar'" class="ml-auto text-[10px] font-mono text-pink-200 bg-pink-500/10 px-1.5 py-0.5 rounded border border-pink-500/20">{{ conn.connectors.length }}</span>
+                    </h4>
+
+                    <!-- Đang chọn thép: các coupler / đầu ren nhận thanh làm thép chủ -->
+                    <template v-if="conn.role === 'bar'">
+                        <p v-if="conn.note" class="text-[11px] text-amber-300 leading-relaxed">{{ conn.note }}</p>
+                        <div v-if="conn.connectors.length" class="rounded-lg border border-slate-800 bg-slate-950/60 divide-y divide-slate-800/80 overflow-hidden">
+                            <div v-for="item in conn.connectors" :key="item.id"
+                                @mouseenter="onConnectionItemEnter(item)" @mouseleave="onConnectionItemLeave"
+                                @click="onConnectionItemClick(item, $event)" @dblclick="onConnectionItemDblClick(item)"
+                                class="px-2.5 py-1.5 text-xs cursor-pointer hover:bg-pink-500/10 select-none" :class="item.removed ? 'opacity-50' : ''">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="min-w-0 flex items-center gap-1.5 font-semibold text-pink-100 truncate">
+                                        <i class="ph-bold ph-nut text-pink-400 shrink-0"></i>
+                                        <span class="truncate">{{ item.label }}</span>
+                                        <i v-if="item.hidden" class="ph-bold ph-eye-slash text-slate-500 shrink-0" :title="t('Đang ẩn')"></i>
+                                    </span>
+                                    <span class="shrink-0 font-mono text-[10px] text-slate-400">{{ item.dims }}</span>
+                                </div>
+                                <div class="text-[10px] text-slate-500 truncate">
+                                    #{{ item.expressID }}<template v-if="item.name"> · {{ item.name }}</template> · {{ t('{0} thép chủ', [item.hostCount]) }}<template v-if="item.via"> · {{ t('thanh {0}', [item.via]) }}</template>
+                                </div>
+                            </div>
+                        </div>
+                        <p v-else class="text-[11px] text-slate-500">{{ t('Không có coupler / đầu ren nào nhận thanh này là thép chủ.') }}</p>
+                    </template>
+
+                    <!-- Đang chọn liên kết: thép chủ và các liên kết cùng mối nối -->
+                    <template v-else-if="conn.role === 'connector'">
+                        <div class="flex items-center justify-between gap-2 text-[11px]">
+                            <span class="text-slate-400">{{ t('Hình dạng (lăng trụ tròn)') }}</span>
+                            <span class="font-mono text-slate-200">{{ conn.dims }}</span>
+                        </div>
+                        <div class="text-[10px] font-semibold text-pink-300/80 uppercase tracking-wider">{{ t('Thép chủ ({0})', [conn.hosts.length]) }}</div>
+                        <div v-if="conn.hosts.length" class="rounded-lg border border-slate-800 bg-slate-950/60 divide-y divide-slate-800/80 overflow-hidden">
+                            <div v-for="item in conn.hosts" :key="item.id"
+                                @mouseenter="onConnectionItemEnter(item)" @mouseleave="onConnectionItemLeave"
+                                @click="onConnectionItemClick(item, $event)" @dblclick="onConnectionItemDblClick(item)"
+                                class="px-2.5 py-1.5 text-xs cursor-pointer hover:bg-amber-500/10 select-none" :class="item.removed ? 'opacity-50' : ''">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="min-w-0 flex items-center gap-1.5 font-semibold text-amber-200 truncate">
+                                        <i class="ph-bold ph-cylinder text-amber-400 shrink-0"></i>
+                                        <span class="truncate">{{ item.label }}</span>
+                                        <i v-if="item.hidden" class="ph-bold ph-eye-slash text-slate-500 shrink-0" :title="t('Đang ẩn')"></i>
+                                    </span>
+                                    <span v-if="item.offsetMm !== null" class="shrink-0 font-mono text-[10px] text-slate-400" :title="t('Khoảng cách tâm thanh tới trục liên kết')">{{ t('lệch trục {0} mm', [item.offsetMm]) }}</span>
+                                </div>
+                                <div class="text-[10px] text-slate-500 truncate">
+                                    #{{ item.expressID }}<template v-if="item.name"> · {{ item.name }}</template><template v-if="item.part"> · {{ t('thanh {0} của cấu kiện', [item.part]) }}</template>
+                                </div>
+                            </div>
+                        </div>
+                        <p v-else class="text-[11px] text-amber-300 leading-relaxed">{{ t('Chưa tìm thấy thép chủ: không có thanh đồng trục đi qua lòng liên kết (hoặc chạm mặt đầu ≤ 4 mm) và kéo dài ra ngoài.') }}</p>
+                        <template v-if="conn.joint.length">
+                            <div class="text-[10px] font-semibold text-pink-300/80 uppercase tracking-wider">{{ t('Liên kết cùng mối nối ({0})', [conn.joint.length]) }}</div>
+                            <div class="rounded-lg border border-slate-800 bg-slate-950/60 divide-y divide-slate-800/80 overflow-hidden">
+                                <div v-for="item in conn.joint" :key="item.id"
+                                    @mouseenter="onConnectionItemEnter(item)" @mouseleave="onConnectionItemLeave"
+                                    @click="onConnectionItemClick(item, $event)" @dblclick="onConnectionItemDblClick(item)"
+                                    class="px-2.5 py-1.5 text-xs cursor-pointer hover:bg-pink-500/10 select-none" :class="item.removed ? 'opacity-50' : ''">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="min-w-0 flex items-center gap-1.5 font-semibold text-pink-100 truncate">
+                                            <i class="ph-bold ph-nut text-pink-400 shrink-0"></i>
+                                            <span class="truncate">{{ item.label }}</span>
+                                            <i v-if="item.hidden" class="ph-bold ph-eye-slash text-slate-500 shrink-0" :title="t('Đang ẩn')"></i>
+                                        </span>
+                                        <span class="shrink-0 font-mono text-[10px] text-slate-400">{{ item.dims }}</span>
+                                    </div>
+                                    <div class="text-[10px] text-slate-500 truncate">
+                                        #{{ item.expressID }}<template v-if="item.name"> · {{ item.name }}</template> · {{ t('{0} thép chủ', [item.hostCount]) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </template>
+
+                    <!-- Cấu kiện nhỏ không được nhận là liên kết: lý do bị loại -->
+                    <template v-else>
+                        <p class="text-[11px] text-slate-300 leading-relaxed">{{ t('Không nhận là liên kết thép (mọi phần của cấu kiện phải là lăng trụ tròn nhỏ):') }}</p>
+                        <div class="rounded-lg border border-slate-800 bg-slate-950/60 divide-y divide-slate-800/80 overflow-hidden">
+                            <div v-for="reason in conn.reasons" :key="reason.part" class="px-2.5 py-1.5 text-[11px] text-amber-200 leading-relaxed">
+                                <span v-if="conn.parts > 1" class="text-slate-400">{{ t('Phần {0}/{1}:', [reason.part, conn.parts]) }} </span>{{ reason.text }}
+                            </div>
+                        </div>
+                    </template>
+
+                    <p v-if="conn.role !== 'rejected'" class="text-[9px] leading-relaxed text-slate-500">{{ t('Rê chuột để tô sáng, click để chọn, Ctrl+click thêm vào vùng chọn, double-click để zoom.') }}</p>
+                </div></template>
+
                 <!-- CHỈNH SỬA THUỘC TÍNH ATTRIBUTES -->
                 <div class="bg-gradient-to-br from-emerald-950/30 to-slate-900 border border-emerald-500/40 rounded-xl p-3.5 space-y-3">
                     <div class="flex items-center justify-between">

@@ -141,7 +141,7 @@ const connectorHostsByMesh = new WeakMap();
 
 // Mã liên kết lấy từ Pset (bản Allplan giữ lại nhiều khi mang Name của thanh thép), thiếu thì dùng Tag/Name
 const CONNECTOR_CODE_PROPERTIES = ['articlenumber', 'bezeichnung'];
-const getConnectorCode = (ud) => {
+export const getConnectorCode = (ud) => {
     const psets = psetCache.get(getPsetCacheKey(ud.sourceId, ud.expressID)) || [];
     for (const propertyName of CONNECTOR_CODE_PROPERTIES) {
         for (const pset of psets) {

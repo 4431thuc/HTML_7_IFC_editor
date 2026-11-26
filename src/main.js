@@ -32,6 +32,7 @@ import { computeBarSchedule, exportBarScheduleCsv, exportBarScheduleExcel, forma
 import { barScheduleDiameters, barScheduleRows, barScheduleSplitByFile, barScheduleStale, barScheduleTotals, barScheduleVisibleOnly, exportListVersion } from './state/state.js';
 import { psetEditDialog } from './state/state.js';
 import { getSelectedCoords, getSourceCoords } from './ui/coords-info.js';
+import { onConnectionItemClick, onConnectionItemDblClick, onConnectionItemEnter, onConnectionItemLeave, selectedConnections } from './ui/connection-info.js';
 import { coordVersion } from './state/state.js';
 import { groupColorScheme, groupTabMenu, modelEdgeAngleDeg, snapEdgeAngleDeg } from './state/state.js';
 import { applyModelEdgeAngle } from './scene/display.js';
@@ -165,6 +166,11 @@ createApp({
             coordVersion,
             getSelectedCoords,
             getSourceCoords,
+            selectedConnections,
+            onConnectionItemEnter,
+            onConnectionItemLeave,
+            onConnectionItemClick,
+            onConnectionItemDblClick,
             formatDimDistance,
             clashModeActive,
             clashResultsReady,

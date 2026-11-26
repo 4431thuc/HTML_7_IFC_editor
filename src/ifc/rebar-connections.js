@@ -25,27 +25,37 @@ const DUPLICATE_CELL = 0.002;
 
 const meshKeyOf = (mesh) => mesh.userData.meshKey || `${mesh.userData.sourceId || 'demo'}:${mesh.userData.expressID}`;
 
+// web-ifc trả tên kiểu dạng IfcReinforcingBar, loader đổi một số sang chữ hoa: so không phân biệt hoa/thường
+const upper = (value) => String(value || '').toUpperCase();
+const isBarType = (ud) => BAR_TYPES.has(upper(ud.type)) || BAR_TYPES.has(upper(ud.schemaType));
+
 export const isBarMesh = (mesh) => {
     const ud = mesh?.userData || {};
-    return ud.type === 'IFCREINFORCINGBAR' || ud.schemaType === 'IFCREINFORCINGBAR';
+    return upper(ud.type) === 'IFCREINFORCINGBAR' || upper(ud.schemaType) === 'IFCREINFORCINGBAR';
 };
 
 export const isConnectorMesh = (mesh) => {
     const ud = mesh?.userData || {};
-    return !!ud.roundPrism && !BAR_TYPES.has(ud.type) && !BAR_TYPES.has(ud.schemaType);
+    return !!ud.roundPrism && !isBarType(ud);
 };
 
-// Lăng trụ tròn trong hệ local của geometry: { axis, center, length, radius } (mảng số) hoặc null
-export const analyzeRoundPrism = (geometry) => {
+// Lăng trụ tròn trong hệ local của geometry: { prism: { axis, center, length, radius } (mảng số) } hoặc
+// { reason: { code, params } } cho biết vì sao không phải (panel thuộc tính hiển thị để dò file chưa khớp logic)
+const reject = (code, params = []) => ({ reason: { code, params } });
+const toMm = (meters) => Math.round(meters * 10000) / 10;
+export const explainRoundPrism = (geometry) => {
     const position = geometry?.attributes?.position;
-    if (!position) return null;
+    if (!position) return reject('no-geometry');
     const index = geometry.index;
     const indexCount = index ? index.count : position.count;
     const triangleCount = Math.floor(indexCount / 3);
-    if (triangleCount < 8 || triangleCount > MAX_PRISM_TRIANGLES || position.count > MAX_PRISM_VERTICES * 8) return null;
+    if (triangleCount < 8 || triangleCount > MAX_PRISM_TRIANGLES) return reject('triangles', [triangleCount, MAX_PRISM_TRIANGLES]);
+    if (position.count > MAX_PRISM_VERTICES * 8) return reject('vertices', [position.count, MAX_PRISM_VERTICES * 8]);
     if (!geometry.boundingBox) geometry.computeBoundingBox();
     const size = geometry.boundingBox.getSize(new THREE.Vector3());
-    if (size.length() > MAX_CONNECTOR_LENGTH + 4 * MAX_CONNECTOR_RADIUS) return null;
+    if (size.length() > MAX_CONNECTOR_LENGTH + 4 * MAX_CONNECTOR_RADIUS) {
+        return reject('too-big', [toMm(size.length()), toMm(MAX_CONNECTOR_LENGTH + 4 * MAX_CONNECTOR_RADIUS)]);
+    }
 
     // Gom pháp tuyến tam giác theo hướng (đổi dấu về một phía): mặt đáy N cạnh có 2(N-2) tam giác cùng hướng
     const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
@@ -83,7 +93,7 @@ export const analyzeRoundPrism = (geometry) => {
         } else secondCount = Math.max(secondCount, bin.count);
     });
     // Mặt đáy phải trội hẳn so với mọi hướng mặt bên (hộp chữ nhật / lục giác dẹt bị loại ở đây hoặc ở bước dưới)
-    if (!best || best.count < 6 || best.count < secondCount * 1.5) return null;
+    if (!best || best.count < 6 || best.count < secondCount * 1.5) return reject('no-base', [best?.count || 0, secondCount]);
     const axis = best.sum.normalize();
 
     // Đỉnh duy nhất: mọi đỉnh của lăng trụ tròn cách trục bằng nhau
@@ -94,11 +104,11 @@ export const analyzeRoundPrism = (geometry) => {
         const key = `${Math.round(point.x * 1e6)},${Math.round(point.y * 1e6)},${Math.round(point.z * 1e6)}`;
         if (!unique.has(key)) {
             unique.set(key, point.clone());
-            if (unique.size > MAX_PRISM_VERTICES) return null;
+            if (unique.size > MAX_PRISM_VERTICES) return reject('unique-vertices', [`> ${MAX_PRISM_VERTICES}`]);
         }
     }
     const vertices = Array.from(unique.values());
-    if (vertices.length < 6) return null;
+    if (vertices.length < 6) return reject('unique-vertices', [vertices.length]);
     const perpCenter = new THREE.Vector3();
     const perp = new THREE.Vector3();
     let sMin = Infinity, sMax = -Infinity;
@@ -117,9 +127,29 @@ export const analyzeRoundPrism = (geometry) => {
         rMax = Math.max(rMax, r);
     });
     const length = sMax - sMin;
-    if (!(rMax > 1e-4) || !(length > 1e-5) || rMax - rMin > rMax * RADIAL_TOLERANCE + 1e-6) return null;
+    if (!(rMax > 1e-4) || !(length > 1e-5)) return reject('degenerate', [toMm(rMax * 2), toMm(length)]);
+    if (rMax - rMin > rMax * RADIAL_TOLERANCE + 1e-6) {
+        return reject('not-round', [toMm(rMin), toMm(rMax), Math.round(RADIAL_TOLERANCE * 100)]);
+    }
     const center = perpCenter.clone().addScaledVector(axis, (sMin + sMax) / 2);
-    return { axis: axis.toArray(), center: center.toArray(), length, radius: rMax };
+    return { prism: { axis: axis.toArray(), center: center.toArray(), length, radius: rMax } };
+};
+
+export const analyzeRoundPrism = (geometry) => explainRoundPrism(geometry).prism || null;
+
+// Như explainRoundPrism, thêm giới hạn kích thước một liên kết (theo tỉ lệ của mesh). Nơi duy nhất quyết định
+// một mesh có dạng liên kết hay không (tagConnectorShapes và panel thuộc tính cùng dùng).
+export const explainConnectorShape = (mesh) => {
+    const result = explainRoundPrism(mesh.geometry);
+    if (!result.prism) return result;
+    const scale = mesh.matrix.getMaxScaleOnAxis();
+    if (result.prism.radius * scale > MAX_CONNECTOR_RADIUS) {
+        return reject('radius-limit', [toMm(result.prism.radius * scale * 2), toMm(MAX_CONNECTOR_RADIUS * 2)]);
+    }
+    if (result.prism.length * scale > MAX_CONNECTOR_LENGTH) {
+        return reject('length-limit', [toMm(result.prism.length * scale), toMm(MAX_CONNECTOR_LENGTH)]);
+    }
+    return result;
 };
 
 // Lăng trụ của mesh trong hệ tọa độ của ma trận frame (mặc định matrixWorld)
@@ -141,7 +171,7 @@ export const tagConnectorShapes = (meshes) => {
     meshes.forEach(mesh => {
         const ud = mesh.userData;
         delete ud.roundPrism;
-        if (BAR_TYPES.has(ud.type) || BAR_TYPES.has(ud.schemaType)) return;
+        if (isBarType(ud)) return;
         const key = meshKeyOf(mesh);
         if (!byKey.has(key)) byKey.set(key, []);
         byKey.get(key).push(mesh);
@@ -150,10 +180,8 @@ export const tagConnectorShapes = (meshes) => {
     byKey.forEach(parts => {
         const shapes = [];
         for (const mesh of parts) {
-            const prism = analyzeRoundPrism(mesh.geometry);
+            const { prism } = explainConnectorShape(mesh);
             if (!prism) return;
-            const scale = mesh.matrix.getMaxScaleOnAxis();
-            if (prism.radius * scale > MAX_CONNECTOR_RADIUS || prism.length * scale > MAX_CONNECTOR_LENGTH) return;
             shapes.push(prism);
         }
         parts.forEach((mesh, index) => { mesh.userData.roundPrism = shapes[index]; });
@@ -233,6 +261,12 @@ export const findDuplicateConnectors = (meshes) => {
 // vuông góc trục, 8 điểm chạm phải nằm trên một đường tròn (tiết diện thanh song song với liên kết). Thanh xiên
 // cho tiết diện elip (khớp tròn lệch), điểm nằm ngoài thanh thì có tia trượt.
 const SECTION_RAYS = 8;
+// Quạt tia xoay lệch 7,5° so với khung u,v: thanh song song trục X/Y/Z (đa số thép Allplan) có ống 12 cạnh với đỉnh
+// đúng ở 0°/90°/180°/270° của khung, tia không lệch bắn trúng mép giữa hai tam giác và lọt qua do sai số float.
+// 7,5° cách đều mọi bội 15° (bội chung của bước đỉnh 30° và bước tia 45°).
+const SECTION_ANGLE_OFFSET = Math.PI / 24;
+// Cho phép 1 tia trượt (thanh xiên vẫn có thể trùng mép); điểm nằm ngoài thanh thì trượt khoảng nửa số tia
+const SECTION_MAX_MISSES = 1;
 const rayLocal = new THREE.Ray();
 const pointLocal = new THREE.Vector3();
 const directionLocal = new THREE.Vector3();
@@ -279,12 +313,16 @@ const fitCircle = (points) => {
 const sampleSection = (probe, point, frame, maxDistance) => {
     const [u, v] = frame;
     const points = [];
+    let misses = 0;
     for (let k = 0; k < SECTION_RAYS; k++) {
-        const angle = (2 * Math.PI * k) / SECTION_RAYS;
+        const angle = SECTION_ANGLE_OFFSET + (2 * Math.PI * k) / SECTION_RAYS;
         const cos = Math.cos(angle), sin = Math.sin(angle);
         sectionDirection.copy(u).multiplyScalar(cos).addScaledVector(v, sin);
         const distance = firstHitDistance(probe, point, sectionDirection, maxDistance);
-        if (distance === null) return null;
+        if (distance === null) {
+            if (++misses > SECTION_MAX_MISSES) return null;
+            continue;
+        }
         points.push([cos * distance, sin * distance]);
     }
     const circle = fitCircle(points);
@@ -356,6 +394,7 @@ export const buildConnectionIndex = (meshes) => {
         hostLessCount: 0,
         connectorKeyOf: () => null,
         hostsOf: () => null,
+        hostOffsetOf: () => null,
         shouldSkipPair: () => false
     };
     if (connectorMeshes.length === 0) return empty;
@@ -392,7 +431,7 @@ export const buildConnectionIndex = (meshes) => {
         const key = meshKeyOf(mesh);
         const prism = getConnectorPrism(mesh);
         if (!prism) return;
-        if (!elements.has(key)) elements.set(key, { parts: [], candidates: new Map(), hosts: new Set() });
+        if (!elements.has(key)) elements.set(key, { parts: [], candidates: new Map(), hosts: new Set(), hostOffsets: new Map() });
         elements.get(key).parts.push(prism);
     });
     elements.forEach(element => {
@@ -440,6 +479,7 @@ export const buildConnectionIndex = (meshes) => {
                 if (blocked) return;
                 accepted.push(candidate);
                 element.hosts.add(candidate.bar);
+                element.hostOffsets.set(candidate.bar, candidate.offset);
             });
         delete element.candidates;
         delete element.parts;
@@ -455,6 +495,11 @@ export const buildConnectionIndex = (meshes) => {
         const key = connectorKeyOf(mesh);
         return key ? elements.get(key).hosts : null;
     };
+    // Lệch trục (m) của một thép chủ so với trục liên kết, null nếu không phải thép chủ
+    const hostOffsetOf = (mesh, bar) => {
+        const key = connectorKeyOf(mesh);
+        return key ? (elements.get(key).hostOffsets.get(bar) ?? null) : null;
+    };
     // Bỏ qua: liên kết ↔ thép chủ của nó, và hai liên kết cùng một thép chủ (đầu ren nằm trong coupler)
     const shouldSkipPair = (meshA, meshB) => {
         const hostsA = hostsOf(meshA);
@@ -466,5 +511,5 @@ export const buildConnectionIndex = (meshes) => {
         }
         return false;
     };
-    return { connectorCount: elements.size, hostLessCount, connectorKeyOf, hostsOf, shouldSkipPair, elements };
+    return { connectorCount: elements.size, hostLessCount, connectorKeyOf, hostsOf, hostOffsetOf, shouldSkipPair, elements };
 };
