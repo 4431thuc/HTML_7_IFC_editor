@@ -61,3 +61,9 @@
 - xoay cropbox
 - restore all trong mục remove
 - thêm tùy chọn để làm 1 tour hướng dẫn từng chức năng trong web
+- fix lag với các dự án file nặng như BON
+- push thông báo
+- fix trang start ko thấy các dòng []{} pannel html thuần
+-  thêm nút để dẫn tới trang tổng hợp idea, feedback
+- gợi ý 1 style đem lại iconic cho web công ty
+- từ web tạo 1 bộ rule style cho các class, visual-direction.md
